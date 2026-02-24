@@ -44,13 +44,13 @@ const registerUser = async (req, res) => {
         });
 
         // Send email
-        const emailSent = await sendVerificationEmail(email, otpString);
+        const emailResult = await sendVerificationEmail(email, otpString);
 
-        if (!emailSent) {
+        if (!emailResult.success) {
             // Rollback DB writes since email delivery failed completely
             await User.findByIdAndDelete(user._id);
             await Otp.deleteMany({ email });
-            return res.status(500).json({ message: 'Failed to send verification code. Check email configuration and try again.' });
+            return res.status(500).json({ message: emailResult.error || 'Failed to send verification code. Check email configuration.' });
         }
 
         res.status(200).json({
@@ -125,10 +125,10 @@ const resendOtp = async (req, res) => {
         otp: hashedOtp
     });
 
-    const emailSent = await sendVerificationEmail(email, otpString);
+    const emailResult = await sendVerificationEmail(email, otpString);
 
-    if (!emailSent) {
-        return res.status(500).json({ message: 'Backend Error: Failed to send OTP. Ensure EMAIL_USER and EMAIL_PASS are configured in Render.' });
+    if (!emailResult.success) {
+        return res.status(500).json({ message: emailResult.error || 'Backend Error: Failed to send OTP.' });
     }
 
     res.status(200).json({ message: 'OTP sent successfully' });

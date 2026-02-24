@@ -47,10 +47,10 @@ const sendVerificationEmail = async (email, otp) => {
 
         const info = await transporter.sendMail(mailOptions);
         console.log('Verification email sent successfully:', info.messageId);
-        return true;
+        return { success: true };
     } catch (error) {
         console.error('Error sending verification email:', error);
-        return false;
+        return { success: false, error: 'Email Delivery Failed: ' + error.message };
     }
 };
 
