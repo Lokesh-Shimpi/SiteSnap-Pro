@@ -125,7 +125,11 @@ const resendOtp = async (req, res) => {
         otp: hashedOtp
     });
 
-    await sendVerificationEmail(email, otpString);
+    const emailSent = await sendVerificationEmail(email, otpString);
+
+    if (!emailSent) {
+        return res.status(500).json({ message: 'Backend Error: Failed to send OTP. Ensure EMAIL_USER and EMAIL_PASS are configured in Render.' });
+    }
 
     res.status(200).json({ message: 'OTP sent successfully' });
 };
