@@ -5,10 +5,12 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch index.js"
+    "dev": "node --watch index.js",
+    "postinstall": "npx puppeteer install"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@puppeteer/browsers": "^2.13.0",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
