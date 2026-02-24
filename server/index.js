@@ -52,30 +52,18 @@ app.get('/api/screenshot', async (req, res) => {
       launchArgs.push('--single-process');
     }
 
-    // Determine Chrome executable path
-    let execPath = process.env.PUPPETEER_EXECUTABLE_PATH;
-    if (!execPath) {
-      const fs = require('fs');
-      const possiblePaths = [
-        '/usr/bin/google-chrome-stable',
-        '/usr/bin/google-chrome',
-        '/usr/bin/chromium-browser',
-        '/usr/bin/chromium',
-      ];
-      for (const p of possiblePaths) {
-        if (fs.existsSync(p)) {
-          execPath = p;
-          break;
-        }
-      }
-    }
-
-    browser = await puppeteer.launch({
+    const puppeteerOptions = {
       headless: 'new',
       args: launchArgs,
-      executablePath: execPath || puppeteer.executablePath(),
       ignoreHTTPSErrors: true,
-    });
+    };
+
+    // Only override if explicitly set in .env
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+      puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+
+    browser = await puppeteer.launch(puppeteerOptions);
 
     const page = await browser.newPage();
 
