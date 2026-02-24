@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/api';
 import AuthContext from '../context/AuthContext';
 import { ArrowLeft } from 'lucide-react';
 import Navbar from '../components/Navbar';
@@ -18,14 +18,14 @@ export default function BlogEditor() {
         if (isEdit) {
             const fetchBlog = async () => {
                 try {
-                    const res = await axios.get('http://localhost:3000/api/blogs'); // Not the best way since we fetch all, let's just fetch everything or build a GET /api/blogs/:id 
+                    const res = await api.get('/api/blogs'); // Not the best way since we fetch all, let's just fetch everything or build a GET /api/blogs/:id 
                     const blog = res.data.find(b => b._id === id);
                     if (blog) {
                         setTitle(blog.title);
                         setContent(blog.content);
                         const userId = user?.id || user?._id;
                         if (blog.author && blog.author._id !== userId) {
-                            navigate('/blogs'); 
+                            navigate('/blogs');
                         }
                     } else {
                         navigate('/blogs');
@@ -42,13 +42,11 @@ export default function BlogEditor() {
         setLoading(true);
         setError(null);
         try {
-            const token = localStorage.getItem('token');
-            const config = { headers: { Authorization: `Bearer ${token}` } };
             const payload = { title, content };
             if (isEdit) {
-                await axios.put(`http://localhost:3000/api/blogs/${id}`, payload, config);
+                await api.put(`/api/blogs/${id}`, payload);
             } else {
-                await axios.post('http://localhost:3000/api/blogs', payload, config);
+                await api.post('/api/blogs', payload);
             }
             navigate('/blogs');
         } catch (err) {

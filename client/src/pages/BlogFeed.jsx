@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/api';
 import { PlusCircle } from 'lucide-react';
 import BlogCard from '../components/BlogCard';
 import AuthContext from '../context/AuthContext';
@@ -14,7 +14,7 @@ export default function BlogFeed() {
     const fetchBlogs = async () => {
         setLoading(true);
         try {
-            const res = await axios.get(`http://localhost:3000/api/blogs?sort=${sort}`);
+            const res = await api.get(`/api/blogs?sort=${sort}`);
             setBlogs(res.data);
         } catch (error) {
             console.error('Failed to fetch blogs:', error);
@@ -26,7 +26,7 @@ export default function BlogFeed() {
         fetchBlogs();
     }, [sort]);
     const handleLike = async (id) => {
-        if (!user) return; 
+        if (!user) return;
         const userId = user?.id || user?._id;
         setBlogs(prevBlogs => prevBlogs.map(blog => {
             if (blog._id === id) {
@@ -43,9 +43,7 @@ export default function BlogFeed() {
         }));
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.put(`http://localhost:3000/api/blogs/${id}/like`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await api.put(`/api/blogs/${id}/like`);
             setBlogs(prevBlogs => prevBlogs.map(blog => blog._id === id ? res.data : blog));
         } catch (error) {
             console.error('Failed to like post:', error);
@@ -56,9 +54,7 @@ export default function BlogFeed() {
         if (!window.confirm('Are you sure you want to delete this post?')) return;
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:3000/api/blogs/${id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.delete(`/api/blogs/${id}`);
             setBlogs(blogs.filter(blog => blog._id !== id));
         } catch (error) {
             console.error('Failed to delete blog:', error);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import api from '../utils/api';
 
 // Custom Hook for Animate Count Up on Scroll
 function useCountUp(endValue, duration = 2000) {
@@ -78,10 +79,8 @@ export default function LiveStatsBanner() {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                // Ensure graceful fallback to localhost if env var is missing
-                const url = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/stats/public`;
-                const res = await fetch(url);
-                const data = await res.json();
+                const res = await api.get('/api/stats/public');
+                const data = res.data;
 
                 if (data && typeof data.registeredUsers !== 'undefined') {
                     setStats(data);

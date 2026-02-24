@@ -62,9 +62,19 @@ app.get('/api/screenshot', async (req, res) => {
       ignoreHTTPSErrors: true,
     };
 
-    // Only override if explicitly set in .env
-    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-      puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    let execPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    if (!execPath && isRender) {
+      try {
+        const { execSync } = require('child_process');
+        // Find any file named 'chrome' in the project directory, bypassing caching bugs
+        execPath = execSync('find /opt/render/project -type f -name chrome | head -1').toString().trim();
+      } catch (err) {
+        console.error("Warning: could not dynamically find chrome binary", err);
+      }
+    }
+
+    if (execPath) {
+      puppeteerOptions.executablePath = execPath;
     }
 
     browser = await puppeteer.launch(puppeteerOptions);
