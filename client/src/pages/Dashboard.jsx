@@ -31,7 +31,7 @@ export default function Dashboard() {
         setGlobalLatencyData(null);
         setCurrentUrl(url);
         setCurrentView(view);
-        api.get(`/tool/global-ping?url=${encodeURIComponent(url)}`)
+        api.get(`/api/tool/global-ping?url=${encodeURIComponent(url)}`)
             .then(res => setGlobalLatencyData(res.data.results))
             .catch(err => {
                 console.error("Global Latency Error:", err);
@@ -47,7 +47,7 @@ export default function Dashboard() {
             if (!screenshotRes.ok) throw new Error('Failed to capture screenshot');
             const blob = await screenshotRes.blob();
             setScreenshotUrl(URL.createObjectURL(blob));
-            const analysisRes = await api.get(`/tool/analyze?url=${encodeURIComponent(url)}`);
+            const analysisRes = await api.get(`/api/tool/analyze?url=${encodeURIComponent(url)}`);
             setAnalysisData(analysisRes.data);
         } catch (err) {
             console.error(err);
@@ -60,7 +60,7 @@ export default function Dashboard() {
     React.useEffect(() => {
         const fetchMonitors = async () => {
             try {
-                const res = await api.get('/monitor');
+                const res = await api.get('/api/monitor');
                 setMonitors(res.data);
             } catch (e) {
                 console.error("Failed to fetch monitors", e);
@@ -70,7 +70,7 @@ export default function Dashboard() {
     }, []);
     const handleCreateMonitor = async (url) => {
         try {
-            const res = await api.post('/monitor', { url });
+            const res = await api.post('/api/monitor', { url });
             navigate(`/monitor/${res.data._id}`);
         } catch (e) {
             console.error(e);
@@ -81,7 +81,7 @@ export default function Dashboard() {
         e.preventDefault();
         e.stopPropagation();
         try {
-            await api.delete(`/monitor/${id}`);
+            await api.delete(`/api/monitor/${id}`);
             setMonitors(monitors.filter(m => m._id !== id));
         } catch (err) {
             console.error(err);

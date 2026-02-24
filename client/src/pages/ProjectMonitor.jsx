@@ -15,7 +15,7 @@ const ProjectMonitor = () => {
     const [error, setError] = useState(null);
     const fetchProject = async () => {
         try {
-            const res = await api.get(`/monitor/${id}`);
+            const res = await api.get(`/api/monitor/${id}`);
             setProject(res.data);
         } catch (err) {
             setError(err.response?.data?.message || err.message);
@@ -29,7 +29,7 @@ const ProjectMonitor = () => {
     const handleRunCheck = async () => {
         setChecking(true);
         try {
-            await api.post(`/monitor/${id}/check`);
+            await api.post(`/api/monitor/${id}/check`);
             await fetchProject();
         } catch (err) {
             console.error(err);
