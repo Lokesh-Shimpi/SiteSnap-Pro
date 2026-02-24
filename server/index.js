@@ -1,8 +1,4 @@
 const express = require('express');
-// CRITICAL: Force Puppeteer Cache Dir on Render before importing Puppeteer
-if (process.env.RENDER === 'true') {
-  process.env.PUPPETEER_CACHE_DIR = '/opt/render/project/puppeteer';
-}
 const puppeteer = require('puppeteer');
 const cors = require('cors');
 const connectDB = require('./config/db');
@@ -62,19 +58,9 @@ app.get('/api/screenshot', async (req, res) => {
       ignoreHTTPSErrors: true,
     };
 
-    let execPath = process.env.PUPPETEER_EXECUTABLE_PATH;
-    if (!execPath && isRender) {
-      try {
-        const { execSync } = require('child_process');
-        // Find any file named 'chrome' in the project directory, bypassing caching bugs
-        execPath = execSync('find /opt/render/project -type f -name chrome | head -1').toString().trim();
-      } catch (err) {
-        console.error("Warning: could not dynamically find chrome binary", err);
-      }
-    }
-
-    if (execPath) {
-      puppeteerOptions.executablePath = execPath;
+    // Only override if explicitly set in .env
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+      puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
     }
 
     browser = await puppeteer.launch(puppeteerOptions);
