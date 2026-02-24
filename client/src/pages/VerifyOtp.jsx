@@ -112,7 +112,7 @@ export default function VerifyOtp() {
 
             setTimeout(() => setResendStatus(''), 3000);
         } catch (err) {
-            setResendStatus('');
+            setResendStatus(''); // REMOVE 'Sending...' string on failure
             setError(err.response?.data?.message || 'Failed to resend code');
         }
     };
