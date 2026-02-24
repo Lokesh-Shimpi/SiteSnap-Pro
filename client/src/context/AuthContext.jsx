@@ -8,7 +8,7 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const token = localStorage.getItem('token');
         if (token) {
-            api.get('/auth/me')
+            api.get('/api/auth/me')
                 .then(res => {
                     setUser(res.data);
                     setAuthError(null);
@@ -28,16 +28,16 @@ export const AuthProvider = ({ children }) => {
         }
     }, []);
     const login = async (email, password) => {
-        const { data } = await api.post('/auth/login', { email, password });
+        const { data } = await api.post('/api/auth/login', { email, password });
         localStorage.setItem('token', data.token);
         setUser(data);
     };
     const register = async (username, email, password) => {
-        await api.post('/auth/register', { username, email, password });
+        await api.post('/api/auth/register', { username, email, password });
         // Token and user will be set after OTP verification, not here.
     };
     const verifyOtp = async (email, otp) => {
-        const { data } = await api.post('/auth/verify-otp', { email, otp });
+        const { data } = await api.post('/api/auth/verify-otp', { email, otp });
         localStorage.setItem('token', data.token);
         setUser(data);
     };

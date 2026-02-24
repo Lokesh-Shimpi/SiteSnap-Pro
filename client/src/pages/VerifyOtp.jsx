@@ -102,7 +102,7 @@ export default function VerifyOtp() {
         setError('');
 
         try {
-            await api.post('/auth/resend-otp', { email });
+            await api.post('/api/auth/resend-otp', { email });
             setResendStatus('Code resent successfully!');
             setResendCooldown(60);
 
