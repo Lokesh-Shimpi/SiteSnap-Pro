@@ -18,7 +18,7 @@ export default function Signup() {
         e.preventDefault();
         try {
             await register(username, email, password);
-            navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
+            navigate('/dashboard');
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to create account');
         }
