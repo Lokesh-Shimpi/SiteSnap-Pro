@@ -44,7 +44,14 @@ export default function Dashboard() {
             const screenshotRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/screenshot?url=${encodeURIComponent(url)}&view=${view}`, {
                 headers
             });
-            if (!screenshotRes.ok) throw new Error('Failed to capture screenshot');
+            if (!screenshotRes.ok) {
+                let errDetails = 'Failed to capture screenshot';
+                try {
+                    const errorData = await screenshotRes.json();
+                    errDetails = errorData.error + (errorData.details ? ': ' + errorData.details : '');
+                } catch (e) { }
+                throw new Error(errDetails);
+            }
             const blob = await screenshotRes.blob();
             setScreenshotUrl(URL.createObjectURL(blob));
             const analysisRes = await api.get(`/api/tool/analyze?url=${encodeURIComponent(url)}`);

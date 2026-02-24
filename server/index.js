@@ -1,4 +1,8 @@
 const express = require('express');
+// CRITICAL: Force Puppeteer Cache Dir on Render before importing Puppeteer
+if (process.env.RENDER === 'true') {
+  process.env.PUPPETEER_CACHE_DIR = '/opt/render/project/puppeteer';
+}
 const puppeteer = require('puppeteer');
 const cors = require('cors');
 const connectDB = require('./config/db');
