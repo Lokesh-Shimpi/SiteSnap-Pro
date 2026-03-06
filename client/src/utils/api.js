@@ -1,6 +1,20 @@
 import axios from 'axios';
+
+const resolveBaseUrl = () => {
+    if (import.meta.env.VITE_API_URL) {
+        return import.meta.env.VITE_API_URL;
+    }
+
+    // In production, prefer same-origin instead of localhost fallback.
+    if (import.meta.env.PROD && typeof window !== 'undefined') {
+        return window.location.origin;
+    }
+
+    return 'http://localhost:3000';
+};
+
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000',
+    baseURL: resolveBaseUrl(),
 });
 api.interceptors.request.use(
     (config) => {
