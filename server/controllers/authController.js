@@ -4,6 +4,9 @@ const crypto = require('crypto');
 const User = require('../models/User');
 const Otp = require('../models/Otp');
 const { sendVerificationEmail } = require('../utils/emailService');
+const { OAuth2Client } = require('google-auth-library');
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -163,10 +166,45 @@ const loginUser = async (req, res) => {
 const getMe = async (req, res) => {
     res.status(200).json(req.user);
 };
+
+const googleLogin = async (req, res) => {
+    const { token } = req.body;
+    try {
+        const ticket = await client.verifyIdToken({
+            idToken: token,
+            audience: process.env.GOOGLE_CLIENT_ID,
+        });
+        const payload = ticket.getPayload();
+        const { email, name } = payload;
+
+        let user = await User.findOne({ email: email.toLowerCase() });
+
+        if (!user) {
+            user = await User.create({
+                username: name || email.split('@')[0],
+                email: email.toLowerCase(),
+                authProvider: 'google',
+                isVerified: true
+            });
+        }
+
+        res.json({
+            _id: user.id,
+            username: user.username,
+            email: user.email,
+            token: generateToken(user._id)
+        });
+    } catch (error) {
+        console.error('Google auth error:', error);
+        res.status(401).json({ message: 'Authentication failed' });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
     getMe,
     verifyOtp,
-    resendOtp
+    resendOtp,
+    googleLogin
 };

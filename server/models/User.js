@@ -16,8 +16,12 @@ const userSchema = mongoose.Schema({
         ]
     },
     password: {
+        type: String
+    },
+    authProvider: {
         type: String,
-        required: [true, 'Please add a password']
+        default: 'local',
+        enum: ['local', 'google']
     },
     isVerified: {
         type: Boolean,
@@ -34,6 +38,7 @@ userSchema.pre('save', async function () {
     this.password = await bcrypt.hash(this.password, salt);
 });
 userSchema.methods.matchPassword = async function (enteredPassword) {
+    if (!this.password) return false;
     return await bcrypt.compare(enteredPassword, this.password);
 };
 module.exports = mongoose.model('User', userSchema);

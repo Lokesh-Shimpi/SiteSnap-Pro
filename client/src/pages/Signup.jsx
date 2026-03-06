@@ -2,12 +2,13 @@ import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
 import { UserPlus, Activity } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
 export default function Signup() {
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
-    const { user, register, loading } = useContext(AuthContext);
+    const { user, register, googleLogin, loading } = useContext(AuthContext);
     const navigate = useNavigate();
     useEffect(() => {
         if (!loading && user) {
@@ -23,6 +24,16 @@ export default function Signup() {
             setError(err.response?.data?.message || 'Failed to create account');
         }
     };
+
+    const handleGoogleSuccess = async (credentialResponse) => {
+        try {
+            await googleLogin(credentialResponse.credential);
+            navigate('/dashboard');
+        } catch (err) {
+            setError(err.response?.data?.message || 'Google authentication failed');
+        }
+    };
+
     return (
         <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-[#0B1120] transition-colors duration-300">
             <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-[#000000] rounded-2xl shadow-xl border border-slate-200 dark:border-gray-800 animate-fade-in-up">
@@ -79,13 +90,32 @@ export default function Signup() {
                             Sign Up
                         </button>
                     </div>
-                    <div className="text-center text-sm">
-                        <span className="text-slate-500 dark:text-slate-400">Already have an account? </span>
-                        <Link to="/login" className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300">
-                            Log in
-                        </Link>
-                    </div>
                 </form>
+
+                <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-slate-300 dark:border-gray-700"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                        <span className="px-2 bg-white dark:bg-[#000000] text-slate-500">Or continue with</span>
+                    </div>
+                </div>
+
+                <div className="flex justify-center">
+                    <GoogleLogin
+                        onSuccess={handleGoogleSuccess}
+                        onError={() => {
+                            setError('Google authentication failed');
+                        }}
+                    />
+                </div>
+
+                <div className="text-center text-sm">
+                    <span className="text-slate-500 dark:text-slate-400">Already have an account? </span>
+                    <Link to="/login" className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300">
+                        Log in
+                    </Link>
+                </div>
             </div>
         </div>
     );
