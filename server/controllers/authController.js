@@ -11,7 +11,8 @@ const generateToken = (id) => {
     });
 };
 const registerUser = async (req, res) => {
-    const { username, email, password } = req.body;
+    let { username, email, password } = req.body;
+    if (email) email = email.toLowerCase();
     if (!username || !email || !password) {
         return res.status(400).json({ message: 'Please add all fields' });
     }
@@ -62,7 +63,8 @@ const registerUser = async (req, res) => {
 };
 
 const verifyOtp = async (req, res) => {
-    const { email, otp } = req.body;
+    let { email, otp } = req.body;
+    if (email) email = email.toLowerCase();
 
     if (!email || !otp) {
         return res.status(400).json({ message: 'Email and OTP are required' });
@@ -97,7 +99,8 @@ const verifyOtp = async (req, res) => {
 };
 
 const resendOtp = async (req, res) => {
-    const { email } = req.body;
+    let { email } = req.body;
+    if (email) email = email.toLowerCase();
 
     if (!email) {
         return res.status(400).json({ message: 'Email is required' });
@@ -135,7 +138,8 @@ const resendOtp = async (req, res) => {
 };
 
 const loginUser = async (req, res) => {
-    const { email, password } = req.body;
+    let { email, password } = req.body;
+    if (email) email = email.toLowerCase();
     const user = await User.findOne({ email });
 
     if (user && (await user.matchPassword(password))) {
