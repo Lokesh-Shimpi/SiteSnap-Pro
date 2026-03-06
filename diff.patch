@@ -1,0 +1,621 @@
+commit 8144c7670b9ce75c932dd72e071848f4bfd5afbb
+Author: Your Name <you@example.com>
+Date:   Tue Feb 24 17:30:41 2026 +0530
+
+    feat: remove OTP verification - users can now register and login directly
+
+diff --git a/client/src/App.jsx b/client/src/App.jsx
+index 5cb4e59..dc4f1b8 100644
+--- a/client/src/App.jsx
++++ b/client/src/App.jsx
+@@ -10,7 +10,7 @@ import BlogFeed from './pages/BlogFeed';
+ import BlogEditor from './pages/BlogEditor';
+ import Features from './pages/Features';
+ import About from './pages/About';
+-import VerifyOtp from './pages/VerifyOtp';
++
+ import React, { useContext } from 'react';
+ import AuthContext from './context/AuthContext';
+ import ScrollToTop from './components/ScrollToTop';
+@@ -51,7 +51,7 @@ function App() {
+             <Route path="/features" element={<Features />} />
+             <Route path="/about" element={<About />} />
+             <Route path="/signup" element={<Signup />} />
+-            <Route path="/verify-otp" element={<VerifyOtp />} />
++
+             <Route
+               path="/dashboard"
+               element={
+diff --git a/client/src/context/AuthContext.jsx b/client/src/context/AuthContext.jsx
+index 54deff6..7a2d863 100644
+--- a/client/src/context/AuthContext.jsx
++++ b/client/src/context/AuthContext.jsx
+@@ -33,11 +33,7 @@ export const AuthProvider = ({ children }) => {
+         setUser(data);
+     };
+     const register = async (username, email, password) => {
+-        await api.post('/api/auth/register', { username, email, password });
+-        // Token and user will be set after OTP verification, not here.
+-    };
+-    const verifyOtp = async (email, otp) => {
+-        const { data } = await api.post('/api/auth/verify-otp', { email, otp });
++        const { data } = await api.post('/api/auth/register', { username, email, password });
+         localStorage.setItem('token', data.token);
+         setUser(data);
+     };
+@@ -46,7 +42,7 @@ export const AuthProvider = ({ children }) => {
+         setUser(null);
+     };
+     return (
+-        <AuthContext.Provider value={{ user, login, register, verifyOtp, logout, loading, authError }}>
++        <AuthContext.Provider value={{ user, login, register, logout, loading, authError }}>
+             {children}
+         </AuthContext.Provider>
+     );
+diff --git a/client/src/pages/Login.jsx b/client/src/pages/Login.jsx
+index 75eab4e..eb0f21e 100644
+--- a/client/src/pages/Login.jsx
++++ b/client/src/pages/Login.jsx
+@@ -1,86 +1,81 @@
+-import React, { useState, useContext, useEffect } from 'react';
+-import { useNavigate, Link } from 'react-router-dom';
+-import AuthContext from '../context/AuthContext';
+-import { LogIn, Activity } from 'lucide-react';
+-export default function Login() {
+-    const [email, setEmail] = useState('');
+-    const [password, setPassword] = useState('');
+-    const [error, setError] = useState('');
+-    const { user, login, loading } = useContext(AuthContext);
+-    const navigate = useNavigate();
+-    useEffect(() => {
+-        if (!loading && user) {
+-            navigate('/dashboard');
+-        }
+-    }, [user, loading, navigate]);
+-    const handleSubmit = async (e) => {
+-        e.preventDefault();
+-        try {
+-            await login(email, password);
+-            navigate('/dashboard');
+-        } catch (err) {
+-            setError(err.response?.data?.message || 'Invalid email or password');
+-            if (err.response?.data?.notVerified) {
+-                setTimeout(() => {
+-                    navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
+-                }, 2000);
+-            }
+-        }
+-    };
+-    return (
+-        <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-[#0B1120] transition-colors duration-300">
+-            <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-[#000000] rounded-2xl shadow-xl border border-slate-200 dark:border-gray-800 animate-fade-in-up">
+-                <div className="text-center">
+-                    <div className="flex justify-center items-center gap-2 mb-2">
+-                        <Activity className="h-6 w-6 text-indigo-600 dark:text-indigo-500" />
+-                        <h1 className="text-2xl font-bold text-indigo-600 dark:text-indigo-500 tracking-tight">SiteSnap Pro</h1>
+-                    </div>
+-                    <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white">Welcome Back</h2>
+-                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Sign in to your account</p>
+-                </div>
+-                {error && <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/50 rounded text-red-600 dark:text-red-200 text-sm text-center shadow-sm">{error}</div>}
+-                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+-                    <div className="rounded-md shadow-sm -space-y-px">
+-                        <div>
+-                            <input
+-                                type="email"
+-                                required
+-                                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-slate-300 dark:border-gray-700 placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-white bg-white dark:bg-[#0B1120] rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-colors"
+-                                placeholder="Email address"
+-                                value={email}
+-                                onChange={(e) => setEmail(e.target.value)}
+-                            />
+-                        </div>
+-                        <div>
+-                            <input
+-                                type="password"
+-                                required
+-                                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-slate-300 dark:border-gray-700 placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-white bg-white dark:bg-[#0B1120] rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-colors"
+-                                placeholder="Password"
+-                                value={password}
+-                                onChange={(e) => setPassword(e.target.value)}
+-                            />
+-                        </div>
+-                    </div>
+-                    <div>
+-                        <button
+-                            type="submit"
+-                            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-lg hover:shadow-indigo-500/20 transition-all"
+-                        >
+-                            <span className="absolute left-0 inset-y-0 flex items-center pl-3">
+-                                <LogIn className="h-5 w-5 text-indigo-500 group-hover:text-indigo-400" />
+-                            </span>
+-                            Sign in
+-                        </button>
+-                    </div>
+-                </form>
+-                <div className="text-center text-sm">
+-                    <span className="text-slate-500 dark:text-slate-400">Don't have an account? </span>
+-                    <Link to="/signup" className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300">
+-                        Sign up
+-                    </Link>
+-                </div>
+-            </div>
+-        </div>
+-    );
+-}
++import React, { useState, useContext, useEffect } from 'react';
++import { useNavigate, Link } from 'react-router-dom';
++import AuthContext from '../context/AuthContext';
++import { LogIn, Activity } from 'lucide-react';
++export default function Login() {
++    const [email, setEmail] = useState('');
++    const [password, setPassword] = useState('');
++    const [error, setError] = useState('');
++    const { user, login, loading } = useContext(AuthContext);
++    const navigate = useNavigate();
++    useEffect(() => {
++        if (!loading && user) {
++            navigate('/dashboard');
++        }
++    }, [user, loading, navigate]);
++    const handleSubmit = async (e) => {
++        e.preventDefault();
++        try {
++            await login(email, password);
++            navigate('/dashboard');
++        } catch (err) {
++            setError(err.response?.data?.message || 'Invalid email or password');
++        }
++    };
++    return (
++        <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-[#0B1120] transition-colors duration-300">
++            <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-[#000000] rounded-2xl shadow-xl border border-slate-200 dark:border-gray-800 animate-fade-in-up">
++                <div className="text-center">
++                    <div className="flex justify-center items-center gap-2 mb-2">
++                        <Activity className="h-6 w-6 text-indigo-600 dark:text-indigo-500" />
++                        <h1 className="text-2xl font-bold text-indigo-600 dark:text-indigo-500 tracking-tight">SiteSnap Pro</h1>
++                    </div>
++                    <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white">Welcome Back</h2>
++                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Sign in to your account</p>
++                </div>
++                {error && <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/50 rounded text-red-600 dark:text-red-200 text-sm text-center shadow-sm">{error}</div>}
++                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
++                    <div className="rounded-md shadow-sm -space-y-px">
++                        <div>
++                            <input
++                                type="email"
++                                required
++                                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-slate-300 dark:border-gray-700 placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-white bg-white dark:bg-[#0B1120] rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-colors"
++                                placeholder="Email address"
++                                value={email}
++                                onChange={(e) => setEmail(e.target.value)}
++                            />
++                        </div>
++                        <div>
++                            <input
++                                type="password"
++                                required
++                                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-slate-300 dark:border-gray-700 placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-white bg-white dark:bg-[#0B1120] rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-colors"
++                                placeholder="Password"
++                                value={password}
++                                onChange={(e) => setPassword(e.target.value)}
++                            />
++                        </div>
++                    </div>
++                    <div>
++                        <button
++                            type="submit"
++                            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-lg hover:shadow-indigo-500/20 transition-all"
++                        >
++                            <span className="absolute left-0 inset-y-0 flex items-center pl-3">
++                                <LogIn className="h-5 w-5 text-indigo-500 group-hover:text-indigo-400" />
++                            </span>
++                            Sign in
++                        </button>
++                    </div>
++                </form>
++                <div className="text-center text-sm">
++                    <span className="text-slate-500 dark:text-slate-400">Don't have an account? </span>
++                    <Link to="/signup" className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300">
++                        Sign up
++                    </Link>
++                </div>
++            </div>
++        </div>
++    );
++}
+diff --git a/client/src/pages/Signup.jsx b/client/src/pages/Signup.jsx
+index 7aecdea..43ba550 100644
+--- a/client/src/pages/Signup.jsx
++++ b/client/src/pages/Signup.jsx
+@@ -1,92 +1,92 @@
+-import React, { useState, useContext, useEffect } from 'react';
+-import { useNavigate, Link } from 'react-router-dom';
+-import AuthContext from '../context/AuthContext';
+-import { UserPlus, Activity } from 'lucide-react';
+-export default function Signup() {
+-    const [username, setUsername] = useState('');
+-    const [email, setEmail] = useState('');
+-    const [password, setPassword] = useState('');
+-    const [error, setError] = useState('');
+-    const { user, register, loading } = useContext(AuthContext);
+-    const navigate = useNavigate();
+-    useEffect(() => {
+-        if (!loading && user) {
+-            navigate('/dashboard');
+-        }
+-    }, [user, loading, navigate]);
+-    const handleSubmit = async (e) => {
+-        e.preventDefault();
+-        try {
+-            await register(username, email, password);
+-            navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
+-        } catch (err) {
+-            setError(err.response?.data?.message || 'Failed to create account');
+-        }
+-    };
+-    return (
+-        <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-[#0B1120] transition-colors duration-300">
+-            <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-[#000000] rounded-2xl shadow-xl border border-slate-200 dark:border-gray-800 animate-fade-in-up">
+-                <div className="text-center">
+-                    <div className="flex justify-center items-center gap-2 mb-2">
+-                        <Activity className="h-6 w-6 text-indigo-600 dark:text-indigo-500" />
+-                        <h1 className="text-2xl font-bold text-indigo-600 dark:text-indigo-500 tracking-tight">SiteSnap Pro</h1>
+-                    </div>
+-                    <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white">Create Account</h2>
+-                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Join SiteSnap Pro today</p>
+-                </div>
+-                {error && <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/50 rounded text-red-600 dark:text-red-200 text-sm text-center shadow-sm">{error}</div>}
+-                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+-                    <div className="rounded-md shadow-sm -space-y-px">
+-                        <div>
+-                            <input
+-                                type="text"
+-                                required
+-                                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-slate-300 dark:border-gray-700 placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-white bg-white dark:bg-[#0B1120] rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-colors"
+-                                placeholder="Username"
+-                                value={username}
+-                                onChange={(e) => setUsername(e.target.value)}
+-                            />
+-                        </div>
+-                        <div>
+-                            <input
+-                                type="email"
+-                                required
+-                                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-slate-300 dark:border-gray-700 placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-white bg-white dark:bg-[#0B1120] focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-colors"
+-                                placeholder="Email address"
+-                                value={email}
+-                                onChange={(e) => setEmail(e.target.value)}
+-                            />
+-                        </div>
+-                        <div>
+-                            <input
+-                                type="password"
+-                                required
+-                                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-slate-300 dark:border-gray-700 placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-white bg-white dark:bg-[#0B1120] rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-colors"
+-                                placeholder="Password"
+-                                value={password}
+-                                onChange={(e) => setPassword(e.target.value)}
+-                            />
+-                        </div>
+-                    </div>
+-                    <div>
+-                        <button
+-                            type="submit"
+-                            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-lg hover:shadow-indigo-500/20 transition-all"
+-                        >
+-                            <span className="absolute left-0 inset-y-0 flex items-center pl-3">
+-                                <UserPlus className="h-5 w-5 text-indigo-500 group-hover:text-indigo-400" />
+-                            </span>
+-                            Sign Up
+-                        </button>
+-                    </div>
+-                    <div className="text-center text-sm">
+-                        <span className="text-slate-500 dark:text-slate-400">Already have an account? </span>
+-                        <Link to="/login" className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300">
+-                            Log in
+-                        </Link>
+-                    </div>
+-                </form>
+-            </div>
+-        </div>
+-    );
+-}
++import React, { useState, useContext, useEffect } from 'react';
++import { useNavigate, Link } from 'react-router-dom';
++import AuthContext from '../context/AuthContext';
++import { UserPlus, Activity } from 'lucide-react';
++export default function Signup() {
++    const [username, setUsername] = useState('');
++    const [email, setEmail] = useState('');
++    const [password, setPassword] = useState('');
++    const [error, setError] = useState('');
++    const { user, register, loading } = useContext(AuthContext);
++    const navigate = useNavigate();
++    useEffect(() => {
++        if (!loading && user) {
++            navigate('/dashboard');
++        }
++    }, [user, loading, navigate]);
++    const handleSubmit = async (e) => {
++        e.preventDefault();
++        try {
++            await register(username, email, password);
++            navigate('/dashboard');
++        } catch (err) {
++            setError(err.response?.data?.message || 'Failed to create account');
++        }
++    };
++    return (
++        <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-[#0B1120] transition-colors duration-300">
++            <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-[#000000] rounded-2xl shadow-xl border border-slate-200 dark:border-gray-800 animate-fade-in-up">
++                <div className="text-center">
++                    <div className="flex justify-center items-center gap-2 mb-2">
++                        <Activity className="h-6 w-6 text-indigo-600 dark:text-indigo-500" />
++                        <h1 className="text-2xl font-bold text-indigo-600 dark:text-indigo-500 tracking-tight">SiteSnap Pro</h1>
++                    </div>
++                    <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white">Create Account</h2>
++                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Join SiteSnap Pro today</p>
++                </div>
++                {error && <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/50 rounded text-red-600 dark:text-red-200 text-sm text-center shadow-sm">{error}</div>}
++                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
++                    <div className="rounded-md shadow-sm -space-y-px">
++                        <div>
++                            <input
++                                type="text"
++                                required
++                                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-slate-300 dark:border-gray-700 placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-white bg-white dark:bg-[#0B1120] rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-colors"
++                                placeholder="Username"
++                                value={username}
++                                onChange={(e) => setUsername(e.target.value)}
++                            />
++                        </div>
++                        <div>
++                            <input
++                                type="email"
++                                required
++                                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-slate-300 dark:border-gray-700 placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-white bg-white dark:bg-[#0B1120] focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-colors"
++                                placeholder="Email address"
++                                value={email}
++                                onChange={(e) => setEmail(e.target.value)}
++                            />
++                        </div>
++                        <div>
++                            <input
++                                type="password"
++                                required
++                                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-slate-300 dark:border-gray-700 placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-white bg-white dark:bg-[#0B1120] rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-colors"
++                                placeholder="Password"
++                                value={password}
++                                onChange={(e) => setPassword(e.target.value)}
++                            />
++                        </div>
++                    </div>
++                    <div>
++                        <button
++                            type="submit"
++                            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-lg hover:shadow-indigo-500/20 transition-all"
++                        >
++                            <span className="absolute left-0 inset-y-0 flex items-center pl-3">
++                                <UserPlus className="h-5 w-5 text-indigo-500 group-hover:text-indigo-400" />
++                            </span>
++                            Sign Up
++                        </button>
++                    </div>
++                    <div className="text-center text-sm">
++                        <span className="text-slate-500 dark:text-slate-400">Already have an account? </span>
++                        <Link to="/login" className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300">
++                            Log in
++                        </Link>
++                    </div>
++                </form>
++            </div>
++        </div>
++    );
++}
+diff --git a/server/controllers/authController.js b/server/controllers/authController.js
+index 8e65dc4..2d989a7 100644
+--- a/server/controllers/authController.js
++++ b/server/controllers/authController.js
+@@ -1,15 +1,13 @@
+ const jwt = require('jsonwebtoken');
+ const bcrypt = require('bcryptjs');
+-const crypto = require('crypto');
+ const User = require('../models/User');
+-const Otp = require('../models/Otp');
+-const { sendVerificationEmail } = require('../utils/emailService');
+ 
+ const generateToken = (id) => {
+     return jwt.sign({ id }, process.env.JWT_SECRET, {
+         expiresIn: '30d',
+     });
+ };
++
+ const registerUser = async (req, res) => {
+     const { username, email, password } = req.body;
+     if (!username || !email || !password) {
+@@ -17,135 +15,32 @@ const registerUser = async (req, res) => {
+     }
+     const userExists = await User.findOne({ email });
+     if (userExists) {
+-        if (!userExists.isVerified) {
+-            return res.status(400).json({ message: 'User already exists but is unverified. Please log in to request a new OTP.' });
+-        }
+         return res.status(400).json({ message: 'User already exists' });
+     }
+     const user = await User.create({
+         username,
+         email,
+         password,
+-        isVerified: false
++        isVerified: true
+     });
+ 
+     if (user) {
+-        // Generate 6-digit OTP
+-        const otpString = Math.floor(100000 + Math.random() * 900000).toString();
+-
+-        // Hash the OTP
+-        const salt = await bcrypt.genSalt(10);
+-        const hashedOtp = await bcrypt.hash(otpString, salt);
+-
+-        // Save to DB
+-        await Otp.create({
+-            email,
+-            otp: hashedOtp
+-        });
+-
+-        // Send email
+-        const emailResult = await sendVerificationEmail(email, otpString);
+-
+-        if (!emailResult.success) {
+-            // Rollback DB writes since email delivery failed completely
+-            await User.findByIdAndDelete(user._id);
+-            await Otp.deleteMany({ email });
+-            return res.status(500).json({ message: emailResult.error || 'Failed to send verification code. Check email configuration.' });
+-        }
+-
+-        res.status(200).json({
+-            message: 'User registered. Pick up your OTP from your email.'
++        res.status(201).json({
++            _id: user.id,
++            username: user.username,
++            email: user.email,
++            token: generateToken(user._id)
+         });
+     } else {
+         res.status(400).json({ message: 'Invalid user data' });
+     }
+ };
+ 
+-const verifyOtp = async (req, res) => {
+-    const { email, otp } = req.body;
+-
+-    if (!email || !otp) {
+-        return res.status(400).json({ message: 'Email and OTP are required' });
+-    }
+-
+-    const otpRecord = await Otp.findOne({ email }).sort({ createdAt: -1 });
+-    if (!otpRecord) {
+-        return res.status(400).json({ message: 'OTP expired or not found. Please resend.' });
+-    }
+-
+-    const isMatch = await bcrypt.compare(otp, otpRecord.otp);
+-    if (!isMatch) {
+-        return res.status(400).json({ message: 'Invalid OTP' });
+-    }
+-
+-    const user = await User.findOne({ email });
+-    if (!user) {
+-        return res.status(400).json({ message: 'User not found' });
+-    }
+-
+-    user.isVerified = true;
+-    await user.save();
+-
+-    await Otp.deleteMany({ email });
+-
+-    res.json({
+-        _id: user.id,
+-        username: user.username,
+-        email: user.email,
+-        token: generateToken(user._id)
+-    });
+-};
+-
+-const resendOtp = async (req, res) => {
+-    const { email } = req.body;
+-
+-    if (!email) {
+-        return res.status(400).json({ message: 'Email is required' });
+-    }
+-
+-    const user = await User.findOne({ email });
+-    if (!user) {
+-        return res.status(400).json({ message: 'User not found' });
+-    }
+-    if (user.isVerified) {
+-        return res.status(400).json({ message: 'User is already verified' });
+-    }
+-
+-    // Generate new 6-digit OTP
+-    const otpString = Math.floor(100000 + Math.random() * 900000).toString();
+-
+-    const salt = await bcrypt.genSalt(10);
+-    const hashedOtp = await bcrypt.hash(otpString, salt);
+-
+-    // Delete any existing OTPs for this email to avoid confusion and clutter
+-    await Otp.deleteMany({ email });
+-
+-    await Otp.create({
+-        email,
+-        otp: hashedOtp
+-    });
+-
+-    const emailResult = await sendVerificationEmail(email, otpString);
+-
+-    if (!emailResult.success) {
+-        return res.status(500).json({ message: emailResult.error || 'Backend Error: Failed to send OTP.' });
+-    }
+-
+-    res.status(200).json({ message: 'OTP sent successfully' });
+-};
+-
+ const loginUser = async (req, res) => {
+     const { email, password } = req.body;
+     const user = await User.findOne({ email });
+ 
+     if (user && (await user.matchPassword(password))) {
+-        if (!user.isVerified) {
+-            return res.status(403).json({
+-                message: 'Please verify your email address to log in.',
+-                notVerified: true
+-            });
+-        }
+-
+         res.json({
+             _id: user.id,
+             username: user.username,
+@@ -156,13 +51,13 @@ const loginUser = async (req, res) => {
+         res.status(401).json({ message: 'Invalid credentials' });
+     }
+ };
++
+ const getMe = async (req, res) => {
+     res.status(200).json(req.user);
+ };
++
+ module.exports = {
+     registerUser,
+     loginUser,
+-    getMe,
+-    verifyOtp,
+-    resendOtp
++    getMe
+ };
+diff --git a/server/routes/authRoutes.js b/server/routes/authRoutes.js
+index a51705f..3463ba0 100644
+--- a/server/routes/authRoutes.js
++++ b/server/routes/authRoutes.js
+@@ -1,11 +1,10 @@
+-const express = require('express');
+-const router = express.Router();
+-const { registerUser, loginUser, getMe, verifyOtp, resendOtp } = require('../controllers/authController');
+-const { protect } = require('../middleware/authMiddleware');
+-
+-router.post('/register', registerUser);
+-router.post('/login', loginUser);
+-router.post('/verify-otp', verifyOtp);
+-router.post('/resend-otp', resendOtp);
+-router.get('/me', protect, getMe);
+-module.exports = router;
++const express = require('express');
++const router = express.Router();
++const { registerUser, loginUser, getMe } = require('../controllers/authController');
++const { protect } = require('../middleware/authMiddleware');
++
++router.post('/register', registerUser);
++router.post('/login', loginUser);
++router.get('/me', protect, getMe);
++
++module.exports = router;

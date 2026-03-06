@@ -1,0 +1,216 @@
+commit c306194585a1c5add1b3bc205e2b315a9cdbe370
+Author: Your Name <you@example.com>
+Date:   Fri Mar 6 13:40:45 2026 +0530
+
+    feat(auth): add secure email OTP flow with TTL and verification routes
+
+diff --git a/server/controllers/auth.controller.js b/server/controllers/auth.controller.js
+new file mode 100644
+index 0000000..c00e5dc
+--- /dev/null
++++ b/server/controllers/auth.controller.js
+@@ -0,0 +1,88 @@
++const jwt = require('jsonwebtoken');
++const bcrypt = require('bcryptjs');
++const User = require('../models/User');
++const OtpVerification = require('../models/otp.model');
++const { sendOTPVerificationEmail } = require('../utils/sendEmail');
++
++const generateToken = (id) => {
++    return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
++};
++
++const sendOTP = async (req, res) => {
++    try {
++        const { email } = req.body;
++
++        if (!email) {
++            return res.status(400).json({ message: 'Email is required' });
++        }
++
++        const normalizedEmail = email.toLowerCase().trim();
++        const otp = Math.floor(100000 + Math.random() * 900000).toString();
++        const salt = await bcrypt.genSalt(10);
++        const hashedOtp = await bcrypt.hash(otp, salt);
++
++        // Keep only the latest OTP entry per email.
++        await OtpVerification.deleteMany({ email: normalizedEmail });
++        await OtpVerification.create({
++            email: normalizedEmail,
++            otp: hashedOtp,
++        });
++
++        await sendOTPVerificationEmail(normalizedEmail, otp);
++
++        return res.status(200).json({ message: 'OTP sent successfully' });
++    } catch (error) {
++        console.error('Send OTP Error:', error);
++        return res.status(500).json({ message: 'Failed to send OTP' });
++    }
++};
++
++const verifyOTP = async (req, res) => {
++    try {
++        const { email, otp } = req.body;
++
++        if (!email || !otp) {
++            return res.status(400).json({ message: 'Email and OTP are required' });
++        }
++
++        const normalizedEmail = email.toLowerCase().trim();
++        const otpRecord = await OtpVerification.findOne({ email: normalizedEmail })
++            .sort({ createdAt: -1 });
++
++        if (!otpRecord) {
++            return res.status(400).json({ message: 'OTP expired or not found' });
++        }
++
++        const isValidOtp = await bcrypt.compare(String(otp), otpRecord.otp);
++        if (!isValidOtp) {
++            return res.status(400).json({ message: 'Invalid OTP' });
++        }
++
++        await OtpVerification.deleteMany({ email: normalizedEmail });
++
++        const user = await User.findOne({ email: normalizedEmail });
++        let token;
++
++        if (user) {
++            if (!user.isVerified) {
++                user.isVerified = true;
++                await user.save();
++            }
++            token = generateToken(user._id);
++        }
++
++        return res.status(200).json({
++            message: 'OTP verified successfully',
++            verified: true,
++            ...(token ? { token } : {}),
++        });
++    } catch (error) {
++        console.error('Verify OTP Error:', error);
++        return res.status(500).json({ message: 'Failed to verify OTP' });
++    }
++};
++
++module.exports = {
++    sendOTP,
++    verifyOTP,
++};
+diff --git a/server/models/otp.model.js b/server/models/otp.model.js
+new file mode 100644
+index 0000000..84d0921
+--- /dev/null
++++ b/server/models/otp.model.js
+@@ -0,0 +1,23 @@
++const mongoose = require('mongoose');
++
++const otpSchema = new mongoose.Schema({
++    email: {
++        type: String,
++        required: true,
++        trim: true,
++        lowercase: true,
++    },
++    otp: {
++        type: String,
++        required: true,
++    },
++    createdAt: {
++        type: Date,
++        default: Date.now,
++    },
++});
++
++// Expire OTP entries after 5 minutes.
++otpSchema.index({ createdAt: 1 }, { expireAfterSeconds: 300 });
++
++module.exports = mongoose.models.OtpVerification || mongoose.model('OtpVerification', otpSchema);
+diff --git a/server/routes/auth.routes.js b/server/routes/auth.routes.js
+new file mode 100644
+index 0000000..be96f49
+--- /dev/null
++++ b/server/routes/auth.routes.js
+@@ -0,0 +1,15 @@
++const express = require('express');
++
++const router = express.Router();
++const { protect } = require('../middleware/authMiddleware');
++const { registerUser, loginUser, getMe } = require('../controllers/authController');
++const { sendOTP, verifyOTP } = require('../controllers/auth.controller');
++
++router.post('/register', registerUser);
++router.post('/login', loginUser);
++router.get('/me', protect, getMe);
++
++router.post('/send-otp', sendOTP);
++router.post('/verify-otp', verifyOTP);
++
++module.exports = router;
+diff --git a/server/routes/authRoutes.js b/server/routes/authRoutes.js
+index 3463ba0..ec5ff8f 100644
+--- a/server/routes/authRoutes.js
++++ b/server/routes/authRoutes.js
+@@ -1,10 +1 @@
+-const express = require('express');
+-const router = express.Router();
+-const { registerUser, loginUser, getMe } = require('../controllers/authController');
+-const { protect } = require('../middleware/authMiddleware');
+-
+-router.post('/register', registerUser);
+-router.post('/login', loginUser);
+-router.get('/me', protect, getMe);
+-
+-module.exports = router;
++module.exports = require('./auth.routes');
+diff --git a/server/utils/sendEmail.js b/server/utils/sendEmail.js
+new file mode 100644
+index 0000000..56cb808
+--- /dev/null
++++ b/server/utils/sendEmail.js
+@@ -0,0 +1,44 @@
++const nodemailer = require('nodemailer');
++
++const transporter = nodemailer.createTransport({
++    host: process.env.SMTP_HOST || 'smtp.gmail.com',
++    port: Number(process.env.SMTP_PORT || 587),
++    secure: String(process.env.SMTP_SECURE || 'false') === 'true',
++    auth: {
++        user: process.env.EMAIL_USER,
++        pass: process.env.EMAIL_PASS,
++    },
++});
++
++const sendOTPVerificationEmail = async (email, otp) => {
++    const mailOptions = {
++        from: `"SiteSnap Pro" <${process.env.EMAIL_USER}>`,
++        to: email,
++        subject: 'Your SiteSnap Pro Verification Code',
++        html: `
++            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #f8fafc;">
++                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px;">
++                    <h2 style="margin: 0 0 8px; color: #0f172a;">Verify your email address</h2>
++                    <p style="margin: 0 0 16px; color: #475569; line-height: 1.5;">
++                        Use the one-time password below to continue your authentication flow.
++                    </p>
++                    <div style="display: inline-block; padding: 12px 18px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;">
++                        <span style="font-size: 30px; letter-spacing: 6px; color: #1d4ed8; font-weight: 700; font-family: 'Courier New', monospace;">${otp}</span>
++                    </div>
++                    <p style="margin: 16px 0 0; color: #dc2626; font-size: 14px;">
++                        This code expires in 5 minutes.
++                    </p>
++                    <p style="margin: 16px 0 0; color: #64748b; font-size: 13px; line-height: 1.5;">
++                        If you did not request this code, you can safely ignore this email.
++                    </p>
++                </div>
++            </div>
++        `,
++    };
++
++    await transporter.sendMail(mailOptions);
++};
++
++module.exports = {
++    sendOTPVerificationEmail,
++};
