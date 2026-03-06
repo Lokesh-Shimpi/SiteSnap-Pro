@@ -4,7 +4,7 @@ const AnalysisHistory = require('../models/AnalysisHistory');
 const https = require('https');
 const http = require('http');
 const { URL } = require('url');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 const getSSLInfo = (url) => {
     return new Promise((resolve) => {
         if (!url.startsWith('https')) {
@@ -43,23 +43,8 @@ const calculateCarbonEmissions = (pageSizeInMB) => {
 const getPagePerformance = async (url) => {
     let browser = null;
     try {
-        const isRender = process.env.RENDER === 'true';
-        const launchArgs = [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu',
-        ];
-        if (isRender) {
-            launchArgs.push('--single-process');
-        }
-        browser = await puppeteer.launch({
-            headless: 'new',
-            args: launchArgs,
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(),
+        browser = await puppeteer.connect({
+            browserWSEndpoint: `wss://chrome.browserless.io?token=${process.env.BROWSERLESS_API_KEY}`
         });
         const page = await browser.newPage();
         await page.setViewport({ width: 1366, height: 768 });

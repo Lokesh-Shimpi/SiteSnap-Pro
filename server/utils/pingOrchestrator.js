@@ -129,15 +129,7 @@ async function fetchFromViewDNS(domain) {
     const replys = data.response && data.response.replys ? data.response.replys : [];
 
     if (replys.length === 0) {
-        return [{
-            location: "ViewDNS Result",
-            status: "Down",
-            ip: "N/A",
-            packetLoss: "N/A",
-            min: "N/A",
-            avg: "N/A",
-            max: "N/A"
-        }];
+        throw new Error("ViewDNS API returned successfully but with 0 ping replies.");
     }
 
     let min = Infinity, max = -Infinity, sum = 0, count = 0;
@@ -269,20 +261,39 @@ async function getGlobalLatency(domain) {
     // Strip http/https and paths if necessary
     const host = domain.replace(/^https?:\/\//i, '').split('/')[0];
 
-    try {
-        // Tier 1
-        return await fetchFromGlobalPing(host);
-    } catch (error) {
-        console.error('Tier 1 Primary API failed. Utilizing Tier 2 emergency free-tier fallback.', error.message);
+    // Absolute Primary: Use ViewDNS if API key is provided
+    if (process.env.VIEWDNS_API_KEY) {
         try {
-            // Tier 2
-            return await fetchFromViewDNS(host);
-        } catch (fbError) {
-            console.error('Tier 2 ViewDNS fallback failed:', fbError.message);
-            console.warn('Utilizing Tier 3 Graceful Degradation (Local server ping).');
-            // Tier 3
-            return await localServerPing(host);
+            console.log('VIEWDNS_API_KEY detected: Utilizing Tier 2 ViewDNS as absolute primary.');
+            const results = await fetchFromViewDNS(host);
+            console.log('Success: ViewDNS ping data retrieved.');
+            return results;
+        } catch (error) {
+            console.error('ViewDNS primary attempt failed:', error.message);
+            // Fallback to Globalping if ViewDNS fails
+            try {
+                console.log('Falling back to Globalping...');
+                const results = await fetchFromGlobalPing(host);
+                console.log('Success: Globalping data retrieved.');
+                return results;
+            } catch (gpError) {
+                console.error('Globalping fallback also failed:', gpError.message);
+                console.warn('Utilizing Tier 3 Graceful Degradation (Local server ping).');
+                return await localServerPing(host);
+            }
         }
+    }
+
+    // Default Flow (No ViewDNS key): Globalping -> Local Ping
+    try {
+        console.log('No ViewDNS key detected. Utilizing Globalping as primary.');
+        const results = await fetchFromGlobalPing(host);
+        console.log('Success: Globalping data retrieved.');
+        return results;
+    } catch (gpError) {
+        console.error('Globalping failed:', gpError.message);
+        console.warn('Utilizing Tier 3 Graceful Degradation (Local server ping).');
+        return await localServerPing(host);
     }
 }
 

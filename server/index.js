@@ -1,9 +1,10 @@
 const express = require('express');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 const cors = require('cors');
 const connectDB = require('./config/db');
 
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 connectDB();
 
@@ -37,33 +38,9 @@ app.get('/api/screenshot', async (req, res) => {
 
   let browser = null;
   try {
-    const isRender = process.env.RENDER === 'true';
-    const launchArgs = [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--disable-gpu',
-    ];
-
-    if (isRender) {
-      launchArgs.push('--single-process');
-    }
-
-    const puppeteerOptions = {
-      headless: 'new',
-      args: launchArgs,
-      ignoreHTTPSErrors: true,
-    };
-
-    // Only override if explicitly set in .env
-    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-      puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-    }
-
-    browser = await puppeteer.launch(puppeteerOptions);
+    browser = await puppeteer.connect({
+      browserWSEndpoint: `wss://chrome.browserless.io?token=${process.env.BROWSERLESS_API_KEY}`
+    });
 
     const page = await browser.newPage();
 

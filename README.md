@@ -103,6 +103,3 @@ Create a clean `.env` file in the root of your `server` directory and add the fo
 ## 👨‍💻 Author
 
 **Lokesh Shimpi**
-
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](#link-to-linkedin)
-[![GitHub](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](#link-to-github)

@@ -4,17 +4,11 @@
 echo "Installing dependencies..."
 npm ci
 
-# Clean up any old Puppeteer cache outside the project, just in case
+# Clean up any old Puppeteer cache outside the project
 rm -rf ~/.cache/puppeteer 2>/dev/null
-
-if [ "$RENDER" = "true" ]; then
-    echo "Detected Render environment. Installing Chrome..."
-    # With .puppeteerrc.cjs present, this automatically installs into puppeteer-cache-dir
-    npx puppeteer browsers install chrome
-else
-    echo "Local or Docker environment detected. Skipping explicit Chrome install."
-fi
+rm -rf ./puppeteer-cache-dir 2>/dev/null
 
 # Start the application
 echo "Starting application..."
 npm start
+

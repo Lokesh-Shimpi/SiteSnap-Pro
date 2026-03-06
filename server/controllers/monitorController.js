@@ -1,5 +1,5 @@
 const fs = require('fs');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 const Project = require('../models/Project');
 const { compareScreenshots } = require('../utils/visualDiff');
 const { aiDiagnostics } = require('../utils/aiDiagnostics');
@@ -64,9 +64,8 @@ exports.checkProject = async (req, res) => {
         if (!project) {
             return res.status(404).json({ message: 'Project not found' });
         }
-        browser = await puppeteer.launch({
-            headless: "new",
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        browser = await puppeteer.connect({
+            browserWSEndpoint: `wss://chrome.browserless.io?token=${process.env.BROWSERLESS_API_KEY}`
         });
         page = await browser.newPage();
         await page.setViewport({ width: 1280, height: 800 });
