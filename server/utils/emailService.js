@@ -14,7 +14,10 @@ const sendVerificationEmail = async (email, otp) => {
             },
             tls: {
                 rejectUnauthorized: false
-            }
+            },
+            connectionTimeout: 5000,
+            greetingTimeout: 5000,
+            socketTimeout: 5000
         });
 
         const mailOptions = {
