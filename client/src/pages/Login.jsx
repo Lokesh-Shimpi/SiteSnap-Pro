@@ -20,6 +20,11 @@ export default function Login() {
             navigate('/dashboard');
         } catch (err) {
             setError(err.response?.data?.message || 'Invalid email or password');
+            if (err.response?.data?.notVerified) {
+                setTimeout(() => {
+                    navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
+                }, 2000);
+            }
         }
     };
     return (

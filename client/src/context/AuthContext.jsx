@@ -34,7 +34,11 @@ export const AuthProvider = ({ children }) => {
     };
 
     const register = async (username, email, password) => {
-        const { data } = await api.post('/api/auth/register', { username, email, password });
+        await api.post('/api/auth/register', { username, email, password });
+        // Token and user will be set after OTP verification, not here.
+    };
+    const verifyOtp = async (email, otp) => {
+        const { data } = await api.post('/api/auth/verify-otp', { email, otp });
         localStorage.setItem('token', data.token);
         setUser(data);
     };
@@ -44,7 +48,7 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
     return (
-        <AuthContext.Provider value={{ user, login, register, logout, loading, authError }}>
+        <AuthContext.Provider value={{ user, login, register, verifyOtp, logout, loading, authError }}>
             {children}
         </AuthContext.Provider>
     );
