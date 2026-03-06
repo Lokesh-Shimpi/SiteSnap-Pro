@@ -2,22 +2,14 @@ const nodemailer = require('nodemailer');
 
 const sendVerificationEmail = async (email, otp) => {
     try {
-        // Use TLS on port 587 instead of SSL on port 465 to bypass Render blocking
         const transporter = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
-            port: 587,
-            secure: false, // true for 465, false for 587
-            requireTLS: true,
+            host: process.env.SMTP_HOST || 'smtp.gmail.com',
+            port: Number(process.env.SMTP_PORT || 587),
+            secure: String(process.env.SMTP_SECURE || 'false') === 'true',
             auth: {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASS,
             },
-            tls: {
-                rejectUnauthorized: false
-            },
-            connectionTimeout: 5000,
-            greetingTimeout: 5000,
-            socketTimeout: 5000
         });
 
         const mailOptions = {
