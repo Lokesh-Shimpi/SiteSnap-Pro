@@ -11,6 +11,16 @@ const otpSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    purpose: {
+        type: String,
+        enum: ['signup', 'login'],
+        required: true,
+        default: 'login',
+    },
+    payload: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null,
+    },
     createdAt: {
         type: Date,
         default: Date.now,

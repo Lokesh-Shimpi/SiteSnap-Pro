@@ -4,6 +4,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import VerifyOtp from './pages/VerifyOtp';
 import Dashboard from './pages/Dashboard';
 import ProjectMonitor from './pages/ProjectMonitor';
 import BlogFeed from './pages/BlogFeed';
@@ -51,6 +52,7 @@ function App() {
             <Route path="/features" element={<Features />} />
             <Route path="/about" element={<About />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/verify-otp" element={<VerifyOtp />} />
 
             <Route
               path="/dashboard"

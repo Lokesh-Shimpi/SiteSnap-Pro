@@ -2,7 +2,6 @@ import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
 import { ShieldCheck, ArrowRight, Loader2 } from 'lucide-react';
-import api from '../utils/api';
 
 export default function VerifyOtp() {
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -11,13 +10,14 @@ export default function VerifyOtp() {
     const [resendCooldown, setResendCooldown] = useState(60);
     const [resendStatus, setResendStatus] = useState('');
 
-    const { verifyOtp } = useContext(AuthContext);
+    const { verifyOtp, resendOtp } = useContext(AuthContext);
     const navigate = useNavigate();
     const location = useLocation();
 
     // Get email from query params
     const queryParams = new URLSearchParams(location.search);
     const email = queryParams.get('email');
+    const purpose = queryParams.get('purpose');
 
     const inputRefs = [
         useRef(null), useRef(null), useRef(null),
@@ -25,10 +25,10 @@ export default function VerifyOtp() {
     ];
 
     useEffect(() => {
-        if (!email) {
+        if (!email || !purpose) {
             navigate('/signup');
         }
-    }, [email, navigate]);
+    }, [email, purpose, navigate]);
 
     useEffect(() => {
         let timer;
@@ -86,7 +86,7 @@ export default function VerifyOtp() {
         setError('');
 
         try {
-            await verifyOtp(email, fullOtp);
+            await verifyOtp(email, fullOtp, purpose);
             navigate('/dashboard');
         } catch (err) {
             setError(err.response?.data?.message || 'Verification failed. Please try again.');
@@ -102,7 +102,7 @@ export default function VerifyOtp() {
         setError('');
 
         try {
-            await api.post('/api/auth/resend-otp', { email });
+            await resendOtp(email, purpose);
             setResendStatus('Code resent successfully!');
             setResendCooldown(60);
 
