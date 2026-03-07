@@ -46,13 +46,6 @@ export const AuthProvider = ({ children }) => {
         return data;
     };
 
-    const verifyOtp = async (email, otp) => {
-        const { data } = await api.post('/api/auth/verify-otp', { email, otp });
-        localStorage.setItem('token', data.token);
-        setUser(data);
-        return data;
-    };
-
     const googleLogin = async (token) => {
         const { data } = await api.post('/api/auth/google', { token });
         localStorage.setItem('token', data.token);
@@ -64,7 +57,7 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
     return (
-        <AuthContext.Provider value={{ user, login, register, verifyOtp, googleLogin, logout, loading, authError }}>
+        <AuthContext.Provider value={{ user, login, register, googleLogin, logout, loading, authError }}>
             {children}
         </AuthContext.Provider>
     );

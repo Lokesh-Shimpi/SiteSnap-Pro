@@ -5,7 +5,6 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
-import VerifyOtp from './pages/VerifyOtp';
 import ProjectMonitor from './pages/ProjectMonitor';
 import BlogFeed from './pages/BlogFeed';
 import BlogEditor from './pages/BlogEditor';
@@ -49,7 +48,6 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
-            <Route path="/verify-otp" element={<VerifyOtp />} />
             <Route path="/about" element={<About />} />
             <Route
               path="/dashboard"
