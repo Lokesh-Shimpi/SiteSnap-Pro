@@ -1,0 +1,1180 @@
+﻿commit 69c74babb5f2ab17b9ffa93eb6ef33c9aa101619
+Author: Your Name <you@example.com>
+Date:   Sat Mar 7 09:11:59 2026 +0530
+
+    AuthContext.jsx updated
+
+diff --git a/server/controllers/authController.js b/server/controllers/authController.js
+index 1107707..ccab908 100644
+--- a/server/controllers/authController.js
++++ b/server/controllers/authController.js
+@@ -21,46 +21,21 @@ const registerUser = async (req, res) => {
+     }
+     const userExists = await User.findOne({ email });
+     if (userExists) {
+-        if (!userExists.isVerified) {
+-            return res.status(400).json({ message: 'User already exists but is unverified. Please log in to request a new OTP.' });
+-        }
+         return res.status(400).json({ message: 'User already exists' });
+     }
+     const user = await User.create({
+         username,
+         email,
+         password,
+-        isVerified: false
++        isVerified: true
+     });
+ 
+     if (user) {
+-        // Generate 6-digit OTP
+-        const otpString = Math.floor(100000 + Math.random() * 900000).toString();
+-
+-        // Hash the OTP
+-        const salt = await bcrypt.genSalt(10);
+-        const hashedOtp = await bcrypt.hash(otpString, salt);
+-
+-        // Save to DB
+-        await Otp.create({
+-            email,
+-            otp: hashedOtp
+-        });
+-
+-        // Send email
+-        console.log("Attempting to send OTP to:", req.body.email);
+-        console.log("Using Authenticated Sender:", process.env.EMAIL_USER);
+-        const emailResult = await sendVerificationEmail(email, otpString);
+-
+-        if (!emailResult.success) {
+-            // Rollback DB writes since email delivery failed completely
+-            await User.findByIdAndDelete(user._id);
+-            await Otp.deleteMany({ email });
+-            return res.status(500).json({ message: "Failed to send OTP", error: emailResult.error });
+-        }
+-
+-        res.status(200).json({
+-            message: 'User registered. Pick up your OTP from your email.'
++        res.status(201).json({
++            _id: user.id,
++            username: user.username,
++            email: user.email,
++            token: generateToken(user._id)
+         });
+     } else {
+         res.status(400).json({ message: 'Invalid user data' });
+@@ -150,13 +125,6 @@ const loginUser = async (req, res) => {
+     const user = await User.findOne({ email });
+ 
+     if (user && (await user.matchPassword(password))) {
+-        if (!user.isVerified) {
+-            return res.status(403).json({
+-                message: 'Please verify your email address to log in.',
+-                notVerified: true
+-            });
+-        }
+-
+         res.json({
+             _id: user.id,
+             username: user.username,
+
+commit b2bc3664d1a550e00edd133f6c9c215de99f6585
+Author: Your Name <you@example.com>
+Date:   Fri Mar 6 23:41:27 2026 +0530
+
+    fix: resolved cors issues and fortified nodemailer configuration
+
+diff --git a/server/controllers/authController.js b/server/controllers/authController.js
+index 8d35286..1107707 100644
+--- a/server/controllers/authController.js
++++ b/server/controllers/authController.js
+@@ -48,13 +48,15 @@ const registerUser = async (req, res) => {
+         });
+ 
+         // Send email
++        console.log("Attempting to send OTP to:", req.body.email);
++        console.log("Using Authenticated Sender:", process.env.EMAIL_USER);
+         const emailResult = await sendVerificationEmail(email, otpString);
+ 
+         if (!emailResult.success) {
+             // Rollback DB writes since email delivery failed completely
+             await User.findByIdAndDelete(user._id);
+             await Otp.deleteMany({ email });
+-            return res.status(500).json({ message: emailResult.error || 'Failed to send verification code. Check email configuration.' });
++            return res.status(500).json({ message: "Failed to send OTP", error: emailResult.error });
+         }
+ 
+         res.status(200).json({
+@@ -131,10 +133,12 @@ const resendOtp = async (req, res) => {
+         otp: hashedOtp
+     });
+ 
++    console.log("Attempting to send OTP to:", req.body.email);
++    console.log("Using Authenticated Sender:", process.env.EMAIL_USER);
+     const emailResult = await sendVerificationEmail(email, otpString);
+ 
+     if (!emailResult.success) {
+-        return res.status(500).json({ message: emailResult.error || 'Backend Error: Failed to send OTP.' });
++        return res.status(500).json({ message: "Failed to send OTP", error: emailResult.error });
+     }
+ 
+     res.status(200).json({ message: 'OTP sent successfully' });
+
+commit c0d0a2607f07f8a1f38b8c196d2fbf5c25fa659d
+Author: Your Name <you@example.com>
+Date:   Fri Mar 6 23:15:28 2026 +0530
+
+    fix: auth feature added
+
+diff --git a/server/controllers/authController.js b/server/controllers/authController.js
+index aefc4f8..8d35286 100644
+--- a/server/controllers/authController.js
++++ b/server/controllers/authController.js
+@@ -4,6 +4,9 @@ const crypto = require('crypto');
+ const User = require('../models/User');
+ const Otp = require('../models/Otp');
+ const { sendVerificationEmail } = require('../utils/emailService');
++const { OAuth2Client } = require('google-auth-library');
++
++const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+ 
+ const generateToken = (id) => {
+     return jwt.sign({ id }, process.env.JWT_SECRET, {
+@@ -163,10 +166,45 @@ const loginUser = async (req, res) => {
+ const getMe = async (req, res) => {
+     res.status(200).json(req.user);
+ };
++
++const googleLogin = async (req, res) => {
++    const { token } = req.body;
++    try {
++        const ticket = await client.verifyIdToken({
++            idToken: token,
++            audience: process.env.GOOGLE_CLIENT_ID,
++        });
++        const payload = ticket.getPayload();
++        const { email, name } = payload;
++
++        let user = await User.findOne({ email: email.toLowerCase() });
++
++        if (!user) {
++            user = await User.create({
++                username: name || email.split('@')[0],
++                email: email.toLowerCase(),
++                authProvider: 'google',
++                isVerified: true
++            });
++        }
++
++        res.json({
++            _id: user.id,
++            username: user.username,
++            email: user.email,
++            token: generateToken(user._id)
++        });
++    } catch (error) {
++        console.error('Google auth error:', error);
++        res.status(401).json({ message: 'Authentication failed' });
++    }
++};
++
+ module.exports = {
+     registerUser,
+     loginUser,
+     getMe,
+     verifyOtp,
+-    resendOtp
++    resendOtp,
++    googleLogin
+ };
+
+commit fc5be6751b1a934fa40187c069c52ee8cc0101b0
+Author: Your Name <you@example.com>
+Date:   Fri Mar 6 17:07:49 2026 +0530
+
+    fix: make email comparisons case-insensitive
+
+diff --git a/server/controllers/authController.js b/server/controllers/authController.js
+index 8e65dc4..aefc4f8 100644
+--- a/server/controllers/authController.js
++++ b/server/controllers/authController.js
+@@ -11,7 +11,8 @@ const generateToken = (id) => {
+     });
+ };
+ const registerUser = async (req, res) => {
+-    const { username, email, password } = req.body;
++    let { username, email, password } = req.body;
++    if (email) email = email.toLowerCase();
+     if (!username || !email || !password) {
+         return res.status(400).json({ message: 'Please add all fields' });
+     }
+@@ -62,7 +63,8 @@ const registerUser = async (req, res) => {
+ };
+ 
+ const verifyOtp = async (req, res) => {
+-    const { email, otp } = req.body;
++    let { email, otp } = req.body;
++    if (email) email = email.toLowerCase();
+ 
+     if (!email || !otp) {
+         return res.status(400).json({ message: 'Email and OTP are required' });
+@@ -97,7 +99,8 @@ const verifyOtp = async (req, res) => {
+ };
+ 
+ const resendOtp = async (req, res) => {
+-    const { email } = req.body;
++    let { email } = req.body;
++    if (email) email = email.toLowerCase();
+ 
+     if (!email) {
+         return res.status(400).json({ message: 'Email is required' });
+@@ -135,7 +138,8 @@ const resendOtp = async (req, res) => {
+ };
+ 
+ const loginUser = async (req, res) => {
+-    const { email, password } = req.body;
++    let { email, password } = req.body;
++    if (email) email = email.toLowerCase();
+     const user = await User.findOne({ email });
+ 
+     if (user && (await user.matchPassword(password))) {
+
+commit f6ff6f2f9403a4883127850ad2eeb8cf91a35885
+Author: Your Name <you@example.com>
+Date:   Fri Mar 6 16:36:45 2026 +0530
+
+    Revert "feat: remove OTP verification - users can now register and login directly"
+    
+    This reverts commit 8144c7670b9ce75c932dd72e071848f4bfd5afbb.
+    
+    # Conflicts:
+    #       server/routes/authRoutes.js
+
+diff --git a/server/controllers/authController.js b/server/controllers/authController.js
+index 2d989a7..8e65dc4 100644
+--- a/server/controllers/authController.js
++++ b/server/controllers/authController.js
+@@ -1,13 +1,15 @@
+ const jwt = require('jsonwebtoken');
+ const bcrypt = require('bcryptjs');
++const crypto = require('crypto');
+ const User = require('../models/User');
++const Otp = require('../models/Otp');
++const { sendVerificationEmail } = require('../utils/emailService');
+ 
+ const generateToken = (id) => {
+     return jwt.sign({ id }, process.env.JWT_SECRET, {
+         expiresIn: '30d',
+     });
+ };
+-
+ const registerUser = async (req, res) => {
+     const { username, email, password } = req.body;
+     if (!username || !email || !password) {
+@@ -15,32 +17,135 @@ const registerUser = async (req, res) => {
+     }
+     const userExists = await User.findOne({ email });
+     if (userExists) {
++        if (!userExists.isVerified) {
++            return res.status(400).json({ message: 'User already exists but is unverified. Please log in to request a new OTP.' });
++        }
+         return res.status(400).json({ message: 'User already exists' });
+     }
+     const user = await User.create({
+         username,
+         email,
+         password,
+-        isVerified: true
++        isVerified: false
+     });
+ 
+     if (user) {
+-        res.status(201).json({
+-            _id: user.id,
+-            username: user.username,
+-            email: user.email,
+-            token: generateToken(user._id)
++        // Generate 6-digit OTP
++        const otpString = Math.floor(100000 + Math.random() * 900000).toString();
++
++        // Hash the OTP
++        const salt = await bcrypt.genSalt(10);
++        const hashedOtp = await bcrypt.hash(otpString, salt);
++
++        // Save to DB
++        await Otp.create({
++            email,
++            otp: hashedOtp
++        });
++
++        // Send email
++        const emailResult = await sendVerificationEmail(email, otpString);
++
++        if (!emailResult.success) {
++            // Rollback DB writes since email delivery failed completely
++            await User.findByIdAndDelete(user._id);
++            await Otp.deleteMany({ email });
++            return res.status(500).json({ message: emailResult.error || 'Failed to send verification code. Check email configuration.' });
++        }
++
++        res.status(200).json({
++            message: 'User registered. Pick up your OTP from your email.'
+         });
+     } else {
+         res.status(400).json({ message: 'Invalid user data' });
+     }
+ };
+ 
++const verifyOtp = async (req, res) => {
++    const { email, otp } = req.body;
++
++    if (!email || !otp) {
++        return res.status(400).json({ message: 'Email and OTP are required' });
++    }
++
++    const otpRecord = await Otp.findOne({ email }).sort({ createdAt: -1 });
++    if (!otpRecord) {
++        return res.status(400).json({ message: 'OTP expired or not found. Please resend.' });
++    }
++
++    const isMatch = await bcrypt.compare(otp, otpRecord.otp);
++    if (!isMatch) {
++        return res.status(400).json({ message: 'Invalid OTP' });
++    }
++
++    const user = await User.findOne({ email });
++    if (!user) {
++        return res.status(400).json({ message: 'User not found' });
++    }
++
++    user.isVerified = true;
++    await user.save();
++
++    await Otp.deleteMany({ email });
++
++    res.json({
++        _id: user.id,
++        username: user.username,
++        email: user.email,
++        token: generateToken(user._id)
++    });
++};
++
++const resendOtp = async (req, res) => {
++    const { email } = req.body;
++
++    if (!email) {
++        return res.status(400).json({ message: 'Email is required' });
++    }
++
++    const user = await User.findOne({ email });
++    if (!user) {
++        return res.status(400).json({ message: 'User not found' });
++    }
++    if (user.isVerified) {
++        return res.status(400).json({ message: 'User is already verified' });
++    }
++
++    // Generate new 6-digit OTP
++    const otpString = Math.floor(100000 + Math.random() * 900000).toString();
++
++    const salt = await bcrypt.genSalt(10);
++    const hashedOtp = await bcrypt.hash(otpString, salt);
++
++    // Delete any existing OTPs for this email to avoid confusion and clutter
++    await Otp.deleteMany({ email });
++
++    await Otp.create({
++        email,
++        otp: hashedOtp
++    });
++
++    const emailResult = await sendVerificationEmail(email, otpString);
++
++    if (!emailResult.success) {
++        return res.status(500).json({ message: emailResult.error || 'Backend Error: Failed to send OTP.' });
++    }
++
++    res.status(200).json({ message: 'OTP sent successfully' });
++};
++
+ const loginUser = async (req, res) => {
+     const { email, password } = req.body;
+     const user = await User.findOne({ email });
+ 
+     if (user && (await user.matchPassword(password))) {
++        if (!user.isVerified) {
++            return res.status(403).json({
++                message: 'Please verify your email address to log in.',
++                notVerified: true
++            });
++        }
++
+         res.json({
+             _id: user.id,
+             username: user.username,
+@@ -51,13 +156,13 @@ const loginUser = async (req, res) => {
+         res.status(401).json({ message: 'Invalid credentials' });
+     }
+ };
+-
+ const getMe = async (req, res) => {
+     res.status(200).json(req.user);
+ };
+-
+ module.exports = {
+     registerUser,
+     loginUser,
+-    getMe
++    getMe,
++    verifyOtp,
++    resendOtp
+ };
+
+commit 8144c7670b9ce75c932dd72e071848f4bfd5afbb
+Author: Your Name <you@example.com>
+Date:   Tue Feb 24 17:30:41 2026 +0530
+
+    feat: remove OTP verification - users can now register and login directly
+
+diff --git a/server/controllers/authController.js b/server/controllers/authController.js
+index 8e65dc4..2d989a7 100644
+--- a/server/controllers/authController.js
++++ b/server/controllers/authController.js
+@@ -1,15 +1,13 @@
+ const jwt = require('jsonwebtoken');
+ const bcrypt = require('bcryptjs');
+-const crypto = require('crypto');
+ const User = require('../models/User');
+-const Otp = require('../models/Otp');
+-const { sendVerificationEmail } = require('../utils/emailService');
+ 
+ const generateToken = (id) => {
+     return jwt.sign({ id }, process.env.JWT_SECRET, {
+         expiresIn: '30d',
+     });
+ };
++
+ const registerUser = async (req, res) => {
+     const { username, email, password } = req.body;
+     if (!username || !email || !password) {
+@@ -17,135 +15,32 @@ const registerUser = async (req, res) => {
+     }
+     const userExists = await User.findOne({ email });
+     if (userExists) {
+-        if (!userExists.isVerified) {
+-            return res.status(400).json({ message: 'User already exists but is unverified. Please log in to request a new OTP.' });
+-        }
+         return res.status(400).json({ message: 'User already exists' });
+     }
+     const user = await User.create({
+         username,
+         email,
+         password,
+-        isVerified: false
++        isVerified: true
+     });
+ 
+     if (user) {
+-        // Generate 6-digit OTP
+-        const otpString = Math.floor(100000 + Math.random() * 900000).toString();
+-
+-        // Hash the OTP
+-        const salt = await bcrypt.genSalt(10);
+-        const hashedOtp = await bcrypt.hash(otpString, salt);
+-
+-        // Save to DB
+-        await Otp.create({
+-            email,
+-            otp: hashedOtp
+-        });
+-
+-        // Send email
+-        const emailResult = await sendVerificationEmail(email, otpString);
+-
+-        if (!emailResult.success) {
+-            // Rollback DB writes since email delivery failed completely
+-            await User.findByIdAndDelete(user._id);
+-            await Otp.deleteMany({ email });
+-            return res.status(500).json({ message: emailResult.error || 'Failed to send verification code. Check email configuration.' });
+-        }
+-
+-        res.status(200).json({
+-            message: 'User registered. Pick up your OTP from your email.'
++        res.status(201).json({
++            _id: user.id,
++            username: user.username,
++            email: user.email,
++            token: generateToken(user._id)
+         });
+     } else {
+         res.status(400).json({ message: 'Invalid user data' });
+     }
+ };
+ 
+-const verifyOtp = async (req, res) => {
+-    const { email, otp } = req.body;
+-
+-    if (!email || !otp) {
+-        return res.status(400).json({ message: 'Email and OTP are required' });
+-    }
+-
+-    const otpRecord = await Otp.findOne({ email }).sort({ createdAt: -1 });
+-    if (!otpRecord) {
+-        return res.status(400).json({ message: 'OTP expired or not found. Please resend.' });
+-    }
+-
+-    const isMatch = await bcrypt.compare(otp, otpRecord.otp);
+-    if (!isMatch) {
+-        return res.status(400).json({ message: 'Invalid OTP' });
+-    }
+-
+-    const user = await User.findOne({ email });
+-    if (!user) {
+-        return res.status(400).json({ message: 'User not found' });
+-    }
+-
+-    user.isVerified = true;
+-    await user.save();
+-
+-    await Otp.deleteMany({ email });
+-
+-    res.json({
+-        _id: user.id,
+-        username: user.username,
+-        email: user.email,
+-        token: generateToken(user._id)
+-    });
+-};
+-
+-const resendOtp = async (req, res) => {
+-    const { email } = req.body;
+-
+-    if (!email) {
+-        return res.status(400).json({ message: 'Email is required' });
+-    }
+-
+-    const user = await User.findOne({ email });
+-    if (!user) {
+-        return res.status(400).json({ message: 'User not found' });
+-    }
+-    if (user.isVerified) {
+-        return res.status(400).json({ message: 'User is already verified' });
+-    }
+-
+-    // Generate new 6-digit OTP
+-    const otpString = Math.floor(100000 + Math.random() * 900000).toString();
+-
+-    const salt = await bcrypt.genSalt(10);
+-    const hashedOtp = await bcrypt.hash(otpString, salt);
+-
+-    // Delete any existing OTPs for this email to avoid confusion and clutter
+-    await Otp.deleteMany({ email });
+-
+-    await Otp.create({
+-        email,
+-        otp: hashedOtp
+-    });
+-
+-    const emailResult = await sendVerificationEmail(email, otpString);
+-
+-    if (!emailResult.success) {
+-        return res.status(500).json({ message: emailResult.error || 'Backend Error: Failed to send OTP.' });
+-    }
+-
+-    res.status(200).json({ message: 'OTP sent successfully' });
+-};
+-
+ const loginUser = async (req, res) => {
+     const { email, password } = req.body;
+     const user = await User.findOne({ email });
+ 
+     if (user && (await user.matchPassword(password))) {
+-        if (!user.isVerified) {
+-            return res.status(403).json({
+-                message: 'Please verify your email address to log in.',
+-                notVerified: true
+-            });
+-        }
+-
+         res.json({
+             _id: user.id,
+             username: user.username,
+@@ -156,13 +51,13 @@ const loginUser = async (req, res) => {
+         res.status(401).json({ message: 'Invalid credentials' });
+     }
+ };
++
+ const getMe = async (req, res) => {
+     res.status(200).json(req.user);
+ };
++
+ module.exports = {
+     registerUser,
+     loginUser,
+-    getMe,
+-    verifyOtp,
+-    resendOtp
++    getMe
+ };
+
+commit 2cc58a7e0040a1311f75295b030b0fa7b187875f
+Author: Your Name <you@example.com>
+Date:   Tue Feb 24 17:26:47 2026 +0530
+
+    feat: return exact nodemailer error message to frontend
+
+diff --git a/server/controllers/authController.js b/server/controllers/authController.js
+index a63ce16..8e65dc4 100644
+--- a/server/controllers/authController.js
++++ b/server/controllers/authController.js
+@@ -44,13 +44,13 @@ const registerUser = async (req, res) => {
+         });
+ 
+         // Send email
+-        const emailSent = await sendVerificationEmail(email, otpString);
++        const emailResult = await sendVerificationEmail(email, otpString);
+ 
+-        if (!emailSent) {
++        if (!emailResult.success) {
+             // Rollback DB writes since email delivery failed completely
+             await User.findByIdAndDelete(user._id);
+             await Otp.deleteMany({ email });
+-            return res.status(500).json({ message: 'Failed to send verification code. Check email configuration and try again.' });
++            return res.status(500).json({ message: emailResult.error || 'Failed to send verification code. Check email configuration.' });
+         }
+ 
+         res.status(200).json({
+@@ -125,10 +125,10 @@ const resendOtp = async (req, res) => {
+         otp: hashedOtp
+     });
+ 
+-    const emailSent = await sendVerificationEmail(email, otpString);
++    const emailResult = await sendVerificationEmail(email, otpString);
+ 
+-    if (!emailSent) {
+-        return res.status(500).json({ message: 'Backend Error: Failed to send OTP. Ensure EMAIL_USER and EMAIL_PASS are configured in Render.' });
++    if (!emailResult.success) {
++        return res.status(500).json({ message: emailResult.error || 'Backend Error: Failed to send OTP.' });
+     }
+ 
+     res.status(200).json({ message: 'OTP sent successfully' });
+
+commit 46acaf0e50264319ca5a29cc989056b5a4bf7e85
+Author: Your Name <you@example.com>
+Date:   Tue Feb 24 16:52:14 2026 +0530
+
+    fix: Return 500 error if OTP email fails to send
+
+diff --git a/server/controllers/authController.js b/server/controllers/authController.js
+index 2457b81..a63ce16 100644
+--- a/server/controllers/authController.js
++++ b/server/controllers/authController.js
+@@ -1,164 +1,168 @@
+-const jwt = require('jsonwebtoken');
+-const bcrypt = require('bcryptjs');
+-const crypto = require('crypto');
+-const User = require('../models/User');
+-const Otp = require('../models/Otp');
+-const { sendVerificationEmail } = require('../utils/emailService');
+-
+-const generateToken = (id) => {
+-    return jwt.sign({ id }, process.env.JWT_SECRET, {
+-        expiresIn: '30d',
+-    });
+-};
+-const registerUser = async (req, res) => {
+-    const { username, email, password } = req.body;
+-    if (!username || !email || !password) {
+-        return res.status(400).json({ message: 'Please add all fields' });
+-    }
+-    const userExists = await User.findOne({ email });
+-    if (userExists) {
+-        if (!userExists.isVerified) {
+-            return res.status(400).json({ message: 'User already exists but is unverified. Please log in to request a new OTP.' });
+-        }
+-        return res.status(400).json({ message: 'User already exists' });
+-    }
+-    const user = await User.create({
+-        username,
+-        email,
+-        password,
+-        isVerified: false
+-    });
+-
+-    if (user) {
+-        // Generate 6-digit OTP
+-        const otpString = Math.floor(100000 + Math.random() * 900000).toString();
+-
+-        // Hash the OTP
+-        const salt = await bcrypt.genSalt(10);
+-        const hashedOtp = await bcrypt.hash(otpString, salt);
+-
+-        // Save to DB
+-        await Otp.create({
+-            email,
+-            otp: hashedOtp
+-        });
+-
+-        // Send email
+-        const emailSent = await sendVerificationEmail(email, otpString);
+-
+-        if (!emailSent) {
+-            // Rollback DB writes since email delivery failed completely
+-            await User.findByIdAndDelete(user._id);
+-            await Otp.deleteMany({ email });
+-            return res.status(500).json({ message: 'Failed to send verification code. Check email configuration and try again.' });
+-        }
+-
+-        res.status(200).json({
+-            message: 'User registered. Pick up your OTP from your email.'
+-        });
+-    } else {
+-        res.status(400).json({ message: 'Invalid user data' });
+-    }
+-};
+-
+-const verifyOtp = async (req, res) => {
+-    const { email, otp } = req.body;
+-
+-    if (!email || !otp) {
+-        return res.status(400).json({ message: 'Email and OTP are required' });
+-    }
+-
+-    const otpRecord = await Otp.findOne({ email }).sort({ createdAt: -1 });
+-    if (!otpRecord) {
+-        return res.status(400).json({ message: 'OTP expired or not found. Please resend.' });
+-    }
+-
+-    const isMatch = await bcrypt.compare(otp, otpRecord.otp);
+-    if (!isMatch) {
+-        return res.status(400).json({ message: 'Invalid OTP' });
+-    }
+-
+-    const user = await User.findOne({ email });
+-    if (!user) {
+-        return res.status(400).json({ message: 'User not found' });
+-    }
+-
+-    user.isVerified = true;
+-    await user.save();
+-
+-    await Otp.deleteMany({ email });
+-
+-    res.json({
+-        _id: user.id,
+-        username: user.username,
+-        email: user.email,
+-        token: generateToken(user._id)
+-    });
+-};
+-
+-const resendOtp = async (req, res) => {
+-    const { email } = req.body;
+-
+-    if (!email) {
+-        return res.status(400).json({ message: 'Email is required' });
+-    }
+-
+-    const user = await User.findOne({ email });
+-    if (!user) {
+-        return res.status(400).json({ message: 'User not found' });
+-    }
+-    if (user.isVerified) {
+-        return res.status(400).json({ message: 'User is already verified' });
+-    }
+-
+-    // Generate new 6-digit OTP
+-    const otpString = Math.floor(100000 + Math.random() * 900000).toString();
+-
+-    const salt = await bcrypt.genSalt(10);
+-    const hashedOtp = await bcrypt.hash(otpString, salt);
+-
+-    // Delete any existing OTPs for this email to avoid confusion and clutter
+-    await Otp.deleteMany({ email });
+-
+-    await Otp.create({
+-        email,
+-        otp: hashedOtp
+-    });
+-
+-    await sendVerificationEmail(email, otpString);
+-
+-    res.status(200).json({ message: 'OTP sent successfully' });
+-};
+-
+-const loginUser = async (req, res) => {
+-    const { email, password } = req.body;
+-    const user = await User.findOne({ email });
+-
+-    if (user && (await user.matchPassword(password))) {
+-        if (!user.isVerified) {
+-            return res.status(403).json({
+-                message: 'Please verify your email address to log in.',
+-                notVerified: true
+-            });
+-        }
+-
+-        res.json({
+-            _id: user.id,
+-            username: user.username,
+-            email: user.email,
+-            token: generateToken(user._id)
+-        });
+-    } else {
+-        res.status(401).json({ message: 'Invalid credentials' });
+-    }
+-};
+-const getMe = async (req, res) => {
+-    res.status(200).json(req.user);
+-};
+-module.exports = {
+-    registerUser,
+-    loginUser,
+-    getMe,
+-    verifyOtp,
+-    resendOtp
+-};
++const jwt = require('jsonwebtoken');
++const bcrypt = require('bcryptjs');
++const crypto = require('crypto');
++const User = require('../models/User');
++const Otp = require('../models/Otp');
++const { sendVerificationEmail } = require('../utils/emailService');
++
++const generateToken = (id) => {
++    return jwt.sign({ id }, process.env.JWT_SECRET, {
++        expiresIn: '30d',
++    });
++};
++const registerUser = async (req, res) => {
++    const { username, email, password } = req.body;
++    if (!username || !email || !password) {
++        return res.status(400).json({ message: 'Please add all fields' });
++    }
++    const userExists = await User.findOne({ email });
++    if (userExists) {
++        if (!userExists.isVerified) {
++            return res.status(400).json({ message: 'User already exists but is unverified. Please log in to request a new OTP.' });
++        }
++        return res.status(400).json({ message: 'User already exists' });
++    }
++    const user = await User.create({
++        username,
++        email,
++        password,
++        isVerified: false
++    });
++
++    if (user) {
++        // Generate 6-digit OTP
++        const otpString = Math.floor(100000 + Math.random() * 900000).toString();
++
++        // Hash the OTP
++        const salt = await bcrypt.genSalt(10);
++        const hashedOtp = await bcrypt.hash(otpString, salt);
++
++        // Save to DB
++        await Otp.create({
++            email,
++            otp: hashedOtp
++        });
++
++        // Send email
++        const emailSent = await sendVerificationEmail(email, otpString);
++
++        if (!emailSent) {
++            // Rollback DB writes since email delivery failed completely
++            await User.findByIdAndDelete(user._id);
++            await Otp.deleteMany({ email });
++            return res.status(500).json({ message: 'Failed to send verification code. Check email configuration and try again.' });
++        }
++
++        res.status(200).json({
++            message: 'User registered. Pick up your OTP from your email.'
++        });
++    } else {
++        res.status(400).json({ message: 'Invalid user data' });
++    }
++};
++
++const verifyOtp = async (req, res) => {
++    const { email, otp } = req.body;
++
++    if (!email || !otp) {
++        return res.status(400).json({ message: 'Email and OTP are required' });
++    }
++
++    const otpRecord = await Otp.findOne({ email }).sort({ createdAt: -1 });
++    if (!otpRecord) {
++        return res.status(400).json({ message: 'OTP expired or not found. Please resend.' });
++    }
++
++    const isMatch = await bcrypt.compare(otp, otpRecord.otp);
++    if (!isMatch) {
++        return res.status(400).json({ message: 'Invalid OTP' });
++    }
++
++    const user = await User.findOne({ email });
++    if (!user) {
++        return res.status(400).json({ message: 'User not found' });
++    }
++
++    user.isVerified = true;
++    await user.save();
++
++    await Otp.deleteMany({ email });
++
++    res.json({
++        _id: user.id,
++        username: user.username,
++        email: user.email,
++        token: generateToken(user._id)
++    });
++};
++
++const resendOtp = async (req, res) => {
++    const { email } = req.body;
++
++    if (!email) {
++        return res.status(400).json({ message: 'Email is required' });
++    }
++
++    const user = await User.findOne({ email });
++    if (!user) {
++        return res.status(400).json({ message: 'User not found' });
++    }
++    if (user.isVerified) {
++        return res.status(400).json({ message: 'User is already verified' });
++    }
++
++    // Generate new 6-digit OTP
++    const otpString = Math.floor(100000 + Math.random() * 900000).toString();
++
++    const salt = await bcrypt.genSalt(10);
++    const hashedOtp = await bcrypt.hash(otpString, salt);
++
++    // Delete any existing OTPs for this email to avoid confusion and clutter
++    await Otp.deleteMany({ email });
++
++    await Otp.create({
++        email,
++        otp: hashedOtp
++    });
++
++    const emailSent = await sendVerificationEmail(email, otpString);
++
++    if (!emailSent) {
++        return res.status(500).json({ message: 'Backend Error: Failed to send OTP. Ensure EMAIL_USER and EMAIL_PASS are configured in Render.' });
++    }
++
++    res.status(200).json({ message: 'OTP sent successfully' });
++};
++
++const loginUser = async (req, res) => {
++    const { email, password } = req.body;
++    const user = await User.findOne({ email });
++
++    if (user && (await user.matchPassword(password))) {
++        if (!user.isVerified) {
++            return res.status(403).json({
++                message: 'Please verify your email address to log in.',
++                notVerified: true
++            });
++        }
++
++        res.json({
++            _id: user.id,
++            username: user.username,
++            email: user.email,
++            token: generateToken(user._id)
++        });
++    } else {
++        res.status(401).json({ message: 'Invalid credentials' });
++    }
++};
++const getMe = async (req, res) => {
++    res.status(200).json(req.user);
++};
++module.exports = {
++    registerUser,
++    loginUser,
++    getMe,
++    verifyOtp,
++    resendOtp
++};
+
+commit 6f6afac072aa73b96545faa0c97e94f0ce0268bf
+Author: Your Name <you@example.com>
+Date:   Tue Feb 24 13:40:42 2026 +0530
+
+    feat: init complete project frontend and backend with tailwind auth emailing and puppeteer
+
+diff --git a/server/controllers/authController.js b/server/controllers/authController.js
+new file mode 100644
+index 0000000..2457b81
+--- /dev/null
++++ b/server/controllers/authController.js
+@@ -0,0 +1,164 @@
++const jwt = require('jsonwebtoken');
++const bcrypt = require('bcryptjs');
++const crypto = require('crypto');
++const User = require('../models/User');
++const Otp = require('../models/Otp');
++const { sendVerificationEmail } = require('../utils/emailService');
++
++const generateToken = (id) => {
++    return jwt.sign({ id }, process.env.JWT_SECRET, {
++        expiresIn: '30d',
++    });
++};
++const registerUser = async (req, res) => {
++    const { username, email, password } = req.body;
++    if (!username || !email || !password) {
++        return res.status(400).json({ message: 'Please add all fields' });
++    }
++    const userExists = await User.findOne({ email });
++    if (userExists) {
++        if (!userExists.isVerified) {
++            return res.status(400).json({ message: 'User already exists but is unverified. Please log in to request a new OTP.' });
++        }
++        return res.status(400).json({ message: 'User already exists' });
++    }
++    const user = await User.create({
++        username,
++        email,
++        password,
++        isVerified: false
++    });
++
++    if (user) {
++        // Generate 6-digit OTP
++        const otpString = Math.floor(100000 + Math.random() * 900000).toString();
++
++        // Hash the OTP
++        const salt = await bcrypt.genSalt(10);
++        const hashedOtp = await bcrypt.hash(otpString, salt);
++
++        // Save to DB
++        await Otp.create({
++            email,
++            otp: hashedOtp
++        });
++
++        // Send email
++        const emailSent = await sendVerificationEmail(email, otpString);
++
++        if (!emailSent) {
++            // Rollback DB writes since email delivery failed completely
++            await User.findByIdAndDelete(user._id);
++            await Otp.deleteMany({ email });
++            return res.status(500).json({ message: 'Failed to send verification code. Check email configuration and try again.' });
++        }
++
++        res.status(200).json({
++            message: 'User registered. Pick up your OTP from your email.'
++        });
++    } else {
++        res.status(400).json({ message: 'Invalid user data' });
++    }
++};
++
++const verifyOtp = async (req, res) => {
++    const { email, otp } = req.body;
++
++    if (!email || !otp) {
++        return res.status(400).json({ message: 'Email and OTP are required' });
++    }
++
++    const otpRecord = await Otp.findOne({ email }).sort({ createdAt: -1 });
++    if (!otpRecord) {
++        return res.status(400).json({ message: 'OTP expired or not found. Please resend.' });
++    }
++
++    const isMatch = await bcrypt.compare(otp, otpRecord.otp);
++    if (!isMatch) {
++        return res.status(400).json({ message: 'Invalid OTP' });
++    }
++
++    const user = await User.findOne({ email });
++    if (!user) {
++        return res.status(400).json({ message: 'User not found' });
++    }
++
++    user.isVerified = true;
++    await user.save();
++
++    await Otp.deleteMany({ email });
++
++    res.json({
++        _id: user.id,
++        username: user.username,
++        email: user.email,
++        token: generateToken(user._id)
++    });
++};
++
++const resendOtp = async (req, res) => {
++    const { email } = req.body;
++
++    if (!email) {
++        return res.status(400).json({ message: 'Email is required' });
++    }
++
++    const user = await User.findOne({ email });
++    if (!user) {
++        return res.status(400).json({ message: 'User not found' });
++    }
++    if (user.isVerified) {
++        return res.status(400).json({ message: 'User is already verified' });
++    }
++
++    // Generate new 6-digit OTP
++    const otpString = Math.floor(100000 + Math.random() * 900000).toString();
++
++    const salt = await bcrypt.genSalt(10);
++    const hashedOtp = await bcrypt.hash(otpString, salt);
++
++    // Delete any existing OTPs for this email to avoid confusion and clutter
++    await Otp.deleteMany({ email });
++
++    await Otp.create({
++        email,
++        otp: hashedOtp
++    });
++
++    await sendVerificationEmail(email, otpString);
++
++    res.status(200).json({ message: 'OTP sent successfully' });
++};
++
++const loginUser = async (req, res) => {
++    const { email, password } = req.body;
++    const user = await User.findOne({ email });
++
++    if (user && (await user.matchPassword(password))) {
++        if (!user.isVerified) {
++            return res.status(403).json({
++                message: 'Please verify your email address to log in.',
++                notVerified: true
++            });
++        }
++
++        res.json({
++            _id: user.id,
++            username: user.username,
++            email: user.email,
++            token: generateToken(user._id)
++        });
++    } else {
++        res.status(401).json({ message: 'Invalid credentials' });
++    }
++};
++const getMe = async (req, res) => {
++    res.status(200).json(req.user);
++};
++module.exports = {
++    registerUser,
++    loginUser,
++    getMe,
++    verifyOtp,
++    resendOtp
++};

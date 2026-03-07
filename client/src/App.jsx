@@ -5,12 +5,12 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
+import VerifyOtp from './pages/VerifyOtp';
 import ProjectMonitor from './pages/ProjectMonitor';
 import BlogFeed from './pages/BlogFeed';
 import BlogEditor from './pages/BlogEditor';
 import Features from './pages/Features';
 import About from './pages/About';
-import VerifyOtp from './pages/VerifyOtp';
 import React, { useContext } from 'react';
 import AuthContext from './context/AuthContext';
 import ScrollToTop from './components/ScrollToTop';
@@ -48,10 +48,9 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/features" element={<Features />} />
-            <Route path="/about" element={<About />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/verify-otp" element={<VerifyOtp />} />
+            <Route path="/about" element={<About />} />
             <Route
               path="/dashboard"
               element={

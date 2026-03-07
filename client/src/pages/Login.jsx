@@ -17,8 +17,12 @@ export default function Login() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            await login(email, password);
-            navigate('/dashboard');
+            const data = await login(email, password);
+            if (data && data.requireOtp) {
+                navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
+            } else {
+                navigate('/dashboard');
+            }
         } catch (err) {
             setError(err.response?.data?.message || 'Invalid email or password');
         }
@@ -42,7 +46,7 @@ export default function Login() {
                         <h1 className="text-2xl font-bold text-indigo-600 dark:text-indigo-500 tracking-tight">SiteSnap Pro</h1>
                     </div>
                     <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white">Welcome Back</h2>
-                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Sign in to your account</p>
+                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Login to your account</p>
                 </div>
                 {error && <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/50 rounded text-red-600 dark:text-red-200 text-sm text-center shadow-sm">{error}</div>}
                 <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -76,7 +80,7 @@ export default function Login() {
                             <span className="absolute left-0 inset-y-0 flex items-center pl-3">
                                 <LogIn className="h-5 w-5 text-indigo-500 group-hover:text-indigo-400" />
                             </span>
-                            Sign in
+                            Login
                         </button>
                     </div>
                 </form>
