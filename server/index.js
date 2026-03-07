@@ -12,15 +12,11 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors({
-  origin: function (origin, callback) {
-    // allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    // Allow localhost and any vercel domains dynamically
-    if (origin.includes('localhost') || origin.includes('vercel.app')) {
-      return callback(null, true);
-    }
-    return callback(null, true); // For now, allow all to prevent blocks while testing
-  },
+  origin: [
+    'http://localhost:5173',
+    'https://site-snap-pro.vercel.app',
+    'https://sitesnap-pro.vercel.app'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
