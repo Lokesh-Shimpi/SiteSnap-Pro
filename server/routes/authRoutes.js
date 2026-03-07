@@ -6,7 +6,7 @@ const rateLimit = require('express-rate-limit');
 
 const signupLimiter = rateLimit({
     windowMs: 60 * 60 * 72000, // 72 hours
-    max: 3, // Limit each IP to 3 signups per 72 hours
+    max: 1, // Limit each IP to 1 signup per 72 hours
     message: { message: "Too many accounts created from this IP, please try again after 72 hours" }
 });
 
