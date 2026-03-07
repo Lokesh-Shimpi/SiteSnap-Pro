@@ -24,7 +24,12 @@ export default function Login() {
                 navigate('/dashboard');
             }
         } catch (err) {
-            setError(err.response?.data?.message || 'Invalid email or password');
+            if (err.response?.data?.notVerified) {
+                // User is not verified, navigate to verify-otp page
+                navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
+            } else {
+                setError(err.response?.data?.message || 'Invalid email or password');
+            }
         }
     };
 

@@ -29,19 +29,28 @@ export const AuthProvider = ({ children }) => {
     }, []);
     const login = async (email, password) => {
         const { data } = await api.post('/api/auth/login', { email, password });
-        localStorage.setItem('token', data.token);
-        setUser(data);
+        if (data.token) {
+            localStorage.setItem('token', data.token);
+            setUser(data);
+        }
+        return data;
     };
 
     const register = async (username, email, password) => {
         const { data } = await api.post('/api/auth/register', { username, email, password });
-        localStorage.setItem('token', data.token);
-        setUser(data);
+        // OTP flow: user is not technically "logged in" yet
+        if (data.token) {
+            localStorage.setItem('token', data.token);
+            setUser(data);
+        }
+        return data;
     };
+
     const verifyOtp = async (email, otp) => {
         const { data } = await api.post('/api/auth/verify-otp', { email, otp });
         localStorage.setItem('token', data.token);
         setUser(data);
+        return data;
     };
 
     const googleLogin = async (token) => {
