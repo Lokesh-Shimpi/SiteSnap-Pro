@@ -3,8 +3,15 @@ const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
 const { registerUser, loginUser, getMe } = require('../controllers/authController');
+const rateLimit = require('express-rate-limit');
 
-router.post('/register', registerUser);
+const signupLimiter = rateLimit({
+    windowMs: 60 * 60 * 72000, // 72 hours
+    max: 3, // Limit each IP to 3 signups per 72 hours
+    message: { error: "Too many accounts created from this IP, please try again after 72 hours" }
+});
+
+router.post('/register', signupLimiter, registerUser);
 router.post('/login', loginUser);
 router.get('/me', protect, getMe);
 

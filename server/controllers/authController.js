@@ -2,8 +2,6 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const User = require('../models/User');
-const Otp = require('../models/Otp');
-const { sendVerificationEmail } = require('../utils/emailService');
 const { OAuth2Client } = require('google-auth-library');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -48,48 +46,20 @@ const registerUser = async (req, res) => {
             return res.status(400).json({ message: 'Username is already taken' });
         }
 
-        // Create the unverified user
+        // Create the user
         const user = await User.create({
             username,
             email,
-            password,
-            isVerified: false
+            password
         });
 
         if (user) {
-            // Generate 6-digit crypto-random OTP
-            const otpString = crypto.randomInt(100000, 999999).toString();
-
-            // Hash the OTP
-            const salt = await bcrypt.genSalt(10);
-            const hashedOtp = await bcrypt.hash(otpString, salt);
-
-            // Delete any existing OTPs for email (cleanup)
-            await Otp.deleteMany({ email });
-
-            // Save to DB
-            await Otp.create({
-                email,
-                otp: hashedOtp
+            return res.status(201).json({
+                _id: user.id,
+                username: user.username,
+                email: user.email,
+                token: generateToken(user._id)
             });
-
-            // Send Email
-            console.log("Sending OTP to:", email);
-            try {
-                const emailResult = await sendVerificationEmail(email, otpString);
-
-                if (!emailResult.success) {
-                    throw new Error(emailResult.error);
-                }
-
-                return res.status(201).json({ message: 'OTP sent successfully', email: req.body.email });
-            } catch (error) {
-                console.error(error);
-                // Rollback User and OTP writes if email completely fails
-                await User.findByIdAndDelete(user._id);
-                await Otp.deleteMany({ email });
-                return res.status(500).json({ message: "Failed to send OTP email" });
-            }
         } else {
             return res.status(400).json({ message: 'Invalid user data' });
         }
@@ -193,26 +163,6 @@ const loginUser = async (req, res) => {
         const user = await User.findOne({ email });
 
         if (user && (await user.matchPassword(password))) {
-            if (!user.isVerified) {
-                // Auto-generate and send a fresh OTP if they try to log in unverified
-                const otpString = crypto.randomInt(100000, 999999).toString();
-                const salt = await bcrypt.genSalt(10);
-                const hashedOtp = await bcrypt.hash(otpString, salt);
-
-                await Otp.deleteMany({ email });
-                await Otp.create({ email, otp: hashedOtp });
-                try {
-                    await sendVerificationEmail(email, otpString);
-                } catch (error) {
-                    console.error("Failed to send OTP email during login", error);
-                }
-
-                return res.status(403).json({
-                    error: "UNVERIFIED_ACCOUNT",
-                    email: user.email,
-                    message: "Please verify your account."
-                });
-            }
             res.json({
                 _id: user.id,
                 username: user.username,
@@ -268,7 +218,5 @@ module.exports = {
     registerUser,
     loginUser,
     getMe,
-    verifyOtp,
-    resendOtp,
     googleLogin
 };

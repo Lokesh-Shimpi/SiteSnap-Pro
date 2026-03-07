@@ -20,9 +20,7 @@ export default function Login() {
             await login(email, password);
             navigate('/dashboard');
         } catch (err) {
-            if (err.response?.status === 403 && err.response?.data?.error === 'UNVERIFIED_ACCOUNT') {
-                navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
-            } else if (err.response?.status === 401) {
+            if (err.response?.status === 401) {
                 setError('Invalid credentials');
             } else {
                 setError(err.response?.data?.message || 'Invalid email or password');
