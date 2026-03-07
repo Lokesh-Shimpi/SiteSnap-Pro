@@ -25,7 +25,19 @@ const registerUser = async (req, res) => {
         const userExists = await User.findOne({ email });
         if (userExists) {
             if (!userExists.isVerified) {
-                return res.status(400).json({ message: 'User already exists but is unverified. Please log in to request a new OTP.' });
+                // Auto-generate and send a fresh OTP if they try to sign up again while unverified
+                const otpString = crypto.randomInt(100000, 999999).toString();
+                const salt = await bcrypt.genSalt(10);
+                const hashedOtp = await bcrypt.hash(otpString, salt);
+
+                await Otp.deleteMany({ email });
+                await Otp.create({ email, otp: hashedOtp });
+                await sendVerificationEmail(email, otpString);
+
+                return res.status(400).json({
+                    message: 'User is unverified. A fresh OTP has been sent!',
+                    unverified: true
+                });
             }
             return res.status(400).json({ message: 'User already exists' });
         }
@@ -178,9 +190,19 @@ const loginUser = async (req, res) => {
 
         if (user && (await user.matchPassword(password))) {
             if (!user.isVerified) {
+                // Auto-generate and send a fresh OTP if they try to log in unverified
+                const otpString = crypto.randomInt(100000, 999999).toString();
+                const salt = await bcrypt.genSalt(10);
+                const hashedOtp = await bcrypt.hash(otpString, salt);
+
+                await Otp.deleteMany({ email });
+                await Otp.create({ email, otp: hashedOtp });
+                await sendVerificationEmail(email, otpString);
+
                 return res.status(403).json({
-                    message: 'Please verify your email address to log in.',
-                    notVerified: true
+                    message: 'Please verify your email address. A fresh code has been sent!',
+                    notVerified: true,
+                    requireOtp: true // To trigger frontend routing nicely
                 });
             }
             res.json({
