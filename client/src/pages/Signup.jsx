@@ -21,11 +21,7 @@ export default function Signup() {
             await register(username, email, password);
             navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
         } catch (err) {
-            if (err.response?.data?.message?.includes('unverified')) {
-                navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
-            } else {
-                setError(err.response?.data?.message || 'Failed to create account');
-            }
+            setError(err.response?.data?.message || 'Failed to create account');
         }
     };
 

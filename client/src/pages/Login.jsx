@@ -17,16 +17,13 @@ export default function Login() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const data = await login(email, password);
-            if (data && data.requireOtp) {
-                navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
-            } else {
-                navigate('/dashboard');
-            }
+            await login(email, password);
+            navigate('/dashboard');
         } catch (err) {
-            if (err.response?.data?.notVerified) {
-                // User is not verified, navigate to verify-otp page
+            if (err.response?.status === 403 && err.response?.data?.error === 'UNVERIFIED_ACCOUNT') {
                 navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
+            } else if (err.response?.status === 401) {
+                setError('Invalid credentials');
             } else {
                 setError(err.response?.data?.message || 'Invalid email or password');
             }

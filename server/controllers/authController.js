@@ -75,17 +75,21 @@ const registerUser = async (req, res) => {
 
             // Send Email
             console.log("Sending OTP to:", email);
-            const emailResult = await sendVerificationEmail(email, otpString);
+            try {
+                const emailResult = await sendVerificationEmail(email, otpString);
 
-            if (!emailResult.success) {
+                if (!emailResult.success) {
+                    throw new Error(emailResult.error);
+                }
+
+                return res.status(201).json({ message: 'OTP sent successfully', email: req.body.email });
+            } catch (error) {
+                console.error(error);
                 // Rollback User and OTP writes if email completely fails
                 await User.findByIdAndDelete(user._id);
                 await Otp.deleteMany({ email });
-                return res.status(500).json({ message: "Failed to send OTP", error: emailResult.error });
+                return res.status(500).json({ message: "Failed to send OTP email" });
             }
-
-            // Return 200 OK without JWT (Client will redirect to /verify-otp logic)
-            return res.status(200).json({ message: 'User registered successfully. Please check your email for the OTP.' });
         } else {
             return res.status(400).json({ message: 'Invalid user data' });
         }
@@ -197,12 +201,16 @@ const loginUser = async (req, res) => {
 
                 await Otp.deleteMany({ email });
                 await Otp.create({ email, otp: hashedOtp });
-                await sendVerificationEmail(email, otpString);
+                try {
+                    await sendVerificationEmail(email, otpString);
+                } catch (error) {
+                    console.error("Failed to send OTP email during login", error);
+                }
 
                 return res.status(403).json({
-                    message: 'Please verify your email address. A fresh code has been sent!',
-                    notVerified: true,
-                    requireOtp: true // To trigger frontend routing nicely
+                    error: "UNVERIFIED_ACCOUNT",
+                    email: user.email,
+                    message: "Please verify your account."
                 });
             }
             res.json({
