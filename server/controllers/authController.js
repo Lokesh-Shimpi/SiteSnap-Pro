@@ -21,46 +21,21 @@ const registerUser = async (req, res) => {
     }
     const userExists = await User.findOne({ email });
     if (userExists) {
-        if (!userExists.isVerified) {
-            return res.status(400).json({ message: 'User already exists but is unverified. Please log in to request a new OTP.' });
-        }
         return res.status(400).json({ message: 'User already exists' });
     }
     const user = await User.create({
         username,
         email,
         password,
-        isVerified: false
+        isVerified: true
     });
 
     if (user) {
-        // Generate 6-digit OTP
-        const otpString = Math.floor(100000 + Math.random() * 900000).toString();
-
-        // Hash the OTP
-        const salt = await bcrypt.genSalt(10);
-        const hashedOtp = await bcrypt.hash(otpString, salt);
-
-        // Save to DB
-        await Otp.create({
-            email,
-            otp: hashedOtp
-        });
-
-        // Send email
-        console.log("Attempting to send OTP to:", req.body.email);
-        console.log("Using Authenticated Sender:", process.env.EMAIL_USER);
-        const emailResult = await sendVerificationEmail(email, otpString);
-
-        if (!emailResult.success) {
-            // Rollback DB writes since email delivery failed completely
-            await User.findByIdAndDelete(user._id);
-            await Otp.deleteMany({ email });
-            return res.status(500).json({ message: "Failed to send OTP", error: emailResult.error });
-        }
-
-        res.status(200).json({
-            message: 'User registered. Pick up your OTP from your email.'
+        res.status(201).json({
+            _id: user.id,
+            username: user.username,
+            email: user.email,
+            token: generateToken(user._id)
         });
     } else {
         res.status(400).json({ message: 'Invalid user data' });
@@ -150,13 +125,6 @@ const loginUser = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (user && (await user.matchPassword(password))) {
-        if (!user.isVerified) {
-            return res.status(403).json({
-                message: 'Please verify your email address to log in.',
-                notVerified: true
-            });
-        }
-
         res.json({
             _id: user.id,
             username: user.username,

@@ -1,0 +1,39 @@
+﻿86a1794 fix: resolved cors issues and fortified nodemailer configuration
+b2bc366 fix: resolved cors issues and fortified nodemailer configuration
+c0d0a26 fix: auth feature added
+2526028 fix: replace nodemailer with HTTP API to bypass render firewalls
+acdbfcc fix: gmail otp update
+3581ea4 fix: attempt TLS connection on port 587 to bypass render ENETUNREACH
+edb784b fix: force IPv4 for email delivery to fix ENETUNREACH on Render
+f7a3a73 fix: use nodemailer gmail service preset to ensure delivery
+2d291d0 fix: revert emailService.js to original working configuration
+4e2aa62 fix: otp error
+2167e28 fix: add connection timeouts to nodemailer to prevent hanging on Render
+37df270 feat: complete OTP restoration
+fc5be67 fix: make email comparisons case-insensitive
+f6ff6f2 Revert "feat: remove OTP verification - users can now register and login directly"
+99f990d revert(auth): remove OTP feature and restore direct signup/login flow
+9c7ee91 fix: physically deleted local chromium and fully migrated to browserless
+1a2000d fix(deploy): prevent production API localhost fallback and document required env vars
+c199ee6 feat(auth): enforce OTP verification for both signup and login
+c306194 feat(auth): add secure email OTP flow with TTL and verification routes
+c22823e fix: physically deleted local chromium and fully migrated to browserless
+49128c5 Docker File Change
+577e8a0 docs: Update README.md with professional structure and Problem Solved section
+d987d4b fix: add postinstall hook for puppeteer to install explicitly on deployment platforms
+1653dfa fix: enforce render chrome caching via raw puppeteer config object to bypass hidden build exclusions
+a8e84c1 fix: replace hardcoded localhost with api utility in blogs and stats, and add child_process fallback for chrome detection
+c018635 fix: preconfigure puppeteer cache directory globally for render native environments and parse error json natively in frontend
+61356ac fix: resolve Puppeteer Browser not found error by strictly configuring cache to local .puppeteer-browsers dir on Render
+2d1a9d8 fix: add /api prefix to all frontend API calls and improve Puppeteer Chrome detection on Render
+8144c76 feat: remove OTP verification - users can now register and login directly
+2cc58a7 feat: return exact nodemailer error message to frontend
+edaff3e fix: switch SMTP to port 587 and bypass render SSL blocks
+174c440 fix: force IPv4 for Nodemailer to fix Render connection timeouts
+64922b1 fix: explicit reset of resendStatus on otp resend error
+46acaf0 fix: Return 500 error if OTP email fails to send
+1cfa43a fix: Update auth API routes to include /api prefix
+dfd344f Update index.html
+54804e6 Delete server/.env
+6f6afac feat: init complete project frontend and backend with tailwind auth emailing and puppeteer
+b70a4e6 first commit

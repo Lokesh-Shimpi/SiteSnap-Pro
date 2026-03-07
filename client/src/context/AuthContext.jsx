@@ -34,8 +34,9 @@ export const AuthProvider = ({ children }) => {
     };
 
     const register = async (username, email, password) => {
-        await api.post('/api/auth/register', { username, email, password });
-        // Token and user will be set after OTP verification, not here.
+        const { data } = await api.post('/api/auth/register', { username, email, password });
+        localStorage.setItem('token', data.token);
+        setUser(data);
     };
     const verifyOtp = async (email, otp) => {
         const { data } = await api.post('/api/auth/verify-otp', { email, otp });

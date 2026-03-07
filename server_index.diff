@@ -1,0 +1,561 @@
+﻿commit 86a17942ae988f77177ccdfd9854f3d44870e771
+Author: Your Name <you@example.com>
+Date:   Fri Mar 6 23:50:14 2026 +0530
+
+    fix: resolved cors issues and fortified nodemailer configuration
+
+diff --git a/server/index.js b/server/index.js
+index a5d7750..3648b5d 100644
+--- a/server/index.js
++++ b/server/index.js
+@@ -12,7 +12,7 @@ const app = express();
+ const PORT = process.env.PORT || 3000;
+ 
+ app.use(cors({
+-  origin: ['http://localhost:5173', 'https://sitesnap-pro.vercel.app'],
++  origin: ['http://localhost:5173', 'https://sitesnap-pro.vercel.app', 'https://site-snap-pro.vercel.app'],
+   credentials: true,
+   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+   allowedHeaders: ['Content-Type', 'Authorization']
+
+commit b2bc3664d1a550e00edd133f6c9c215de99f6585
+Author: Your Name <you@example.com>
+Date:   Fri Mar 6 23:41:27 2026 +0530
+
+    fix: resolved cors issues and fortified nodemailer configuration
+
+diff --git a/server/index.js b/server/index.js
+index 8d6e947..a5d7750 100644
+--- a/server/index.js
++++ b/server/index.js
+@@ -11,7 +11,12 @@ connectDB();
+ const app = express();
+ const PORT = process.env.PORT || 3000;
+ 
+-app.use(cors());
++app.use(cors({
++  origin: ['http://localhost:5173', 'https://sitesnap-pro.vercel.app'],
++  credentials: true,
++  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
++  allowedHeaders: ['Content-Type', 'Authorization']
++}));
+ app.use(express.json());
+ 
+ // Routes
+
+commit c22823e9a54aab2926f6cc675320807a16134d98
+Author: Your Name <you@example.com>
+Date:   Fri Mar 6 13:17:03 2026 +0530
+
+    fix: physically deleted local chromium and fully migrated to browserless
+
+diff --git a/server/index.js b/server/index.js
+index caa2b50..8d6e947 100644
+--- a/server/index.js
++++ b/server/index.js
+@@ -1,9 +1,10 @@
+ const express = require('express');
+-const puppeteer = require('puppeteer');
++const puppeteer = require('puppeteer-core');
+ const cors = require('cors');
+ const connectDB = require('./config/db');
+ 
+-require('dotenv').config();
++const path = require('path');
++require('dotenv').config({ path: path.join(__dirname, '.env') });
+ 
+ connectDB();
+ 
+@@ -37,33 +38,9 @@ app.get('/api/screenshot', async (req, res) => {
+ 
+   let browser = null;
+   try {
+-    const isRender = process.env.RENDER === 'true';
+-    const launchArgs = [
+-      '--no-sandbox',
+-      '--disable-setuid-sandbox',
+-      '--disable-dev-shm-usage',
+-      '--disable-accelerated-2d-canvas',
+-      '--no-first-run',
+-      '--no-zygote',
+-      '--disable-gpu',
+-    ];
+-
+-    if (isRender) {
+-      launchArgs.push('--single-process');
+-    }
+-
+-    const puppeteerOptions = {
+-      headless: 'new',
+-      args: launchArgs,
+-      ignoreHTTPSErrors: true,
+-    };
+-
+-    // Only override if explicitly set in .env
+-    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+-      puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+-    }
+-
+-    browser = await puppeteer.launch(puppeteerOptions);
++    browser = await puppeteer.connect({
++      browserWSEndpoint: `wss://chrome.browserless.io?token=${process.env.BROWSERLESS_API_KEY}`
++    });
+ 
+     const page = await browser.newPage();
+ 
+
+commit 1653dfa82e97328960bcd639e3e64b1f66b02b6f
+Author: Your Name <you@example.com>
+Date:   Tue Feb 24 22:24:33 2026 +0530
+
+    fix: enforce render chrome caching via raw puppeteer config object to bypass hidden build exclusions
+
+diff --git a/server/index.js b/server/index.js
+index 64389fb..caa2b50 100644
+--- a/server/index.js
++++ b/server/index.js
+@@ -1,8 +1,4 @@
+ const express = require('express');
+-// CRITICAL: Force Puppeteer Cache Dir on Render before importing Puppeteer
+-if (process.env.RENDER === 'true') {
+-  process.env.PUPPETEER_CACHE_DIR = '/opt/render/project/puppeteer';
+-}
+ const puppeteer = require('puppeteer');
+ const cors = require('cors');
+ const connectDB = require('./config/db');
+@@ -62,19 +58,9 @@ app.get('/api/screenshot', async (req, res) => {
+       ignoreHTTPSErrors: true,
+     };
+ 
+-    let execPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+-    if (!execPath && isRender) {
+-      try {
+-        const { execSync } = require('child_process');
+-        // Find any file named 'chrome' in the project directory, bypassing caching bugs
+-        execPath = execSync('find /opt/render/project -type f -name chrome | head -1').toString().trim();
+-      } catch (err) {
+-        console.error("Warning: could not dynamically find chrome binary", err);
+-      }
+-    }
+-
+-    if (execPath) {
+-      puppeteerOptions.executablePath = execPath;
++    // Only override if explicitly set in .env
++    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
++      puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+     }
+ 
+     browser = await puppeteer.launch(puppeteerOptions);
+
+commit a8e84c1896fd606331a582b29566cfcd33e0b449
+Author: Your Name <you@example.com>
+Date:   Tue Feb 24 22:09:24 2026 +0530
+
+    fix: replace hardcoded localhost with api utility in blogs and stats, and add child_process fallback for chrome detection
+
+diff --git a/server/index.js b/server/index.js
+index 2afbf0e..64389fb 100644
+--- a/server/index.js
++++ b/server/index.js
+@@ -62,9 +62,19 @@ app.get('/api/screenshot', async (req, res) => {
+       ignoreHTTPSErrors: true,
+     };
+ 
+-    // Only override if explicitly set in .env
+-    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+-      puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
++    let execPath = process.env.PUPPETEER_EXECUTABLE_PATH;
++    if (!execPath && isRender) {
++      try {
++        const { execSync } = require('child_process');
++        // Find any file named 'chrome' in the project directory, bypassing caching bugs
++        execPath = execSync('find /opt/render/project -type f -name chrome | head -1').toString().trim();
++      } catch (err) {
++        console.error("Warning: could not dynamically find chrome binary", err);
++      }
++    }
++
++    if (execPath) {
++      puppeteerOptions.executablePath = execPath;
+     }
+ 
+     browser = await puppeteer.launch(puppeteerOptions);
+
+commit c0186353acf79df137ca4d38cbe5ec6bf2fb71ca
+Author: Your Name <you@example.com>
+Date:   Tue Feb 24 21:57:03 2026 +0530
+
+    fix: preconfigure puppeteer cache directory globally for render native environments and parse error json natively in frontend
+
+diff --git a/server/index.js b/server/index.js
+index caa2b50..2afbf0e 100644
+--- a/server/index.js
++++ b/server/index.js
+@@ -1,4 +1,8 @@
+ const express = require('express');
++// CRITICAL: Force Puppeteer Cache Dir on Render before importing Puppeteer
++if (process.env.RENDER === 'true') {
++  process.env.PUPPETEER_CACHE_DIR = '/opt/render/project/puppeteer';
++}
+ const puppeteer = require('puppeteer');
+ const cors = require('cors');
+ const connectDB = require('./config/db');
+
+commit 61356ac9bacb92fecc7ba898774ffae6da9947d3
+Author: Your Name <you@example.com>
+Date:   Tue Feb 24 17:45:18 2026 +0530
+
+    fix: resolve Puppeteer Browser not found error by strictly configuring cache to local .puppeteer-browsers dir on Render
+
+diff --git a/server/index.js b/server/index.js
+index 1a2cd5f..caa2b50 100644
+--- a/server/index.js
++++ b/server/index.js
+@@ -52,30 +52,18 @@ app.get('/api/screenshot', async (req, res) => {
+       launchArgs.push('--single-process');
+     }
+ 
+-    // Determine Chrome executable path
+-    let execPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+-    if (!execPath) {
+-      const fs = require('fs');
+-      const possiblePaths = [
+-        '/usr/bin/google-chrome-stable',
+-        '/usr/bin/google-chrome',
+-        '/usr/bin/chromium-browser',
+-        '/usr/bin/chromium',
+-      ];
+-      for (const p of possiblePaths) {
+-        if (fs.existsSync(p)) {
+-          execPath = p;
+-          break;
+-        }
+-      }
+-    }
+-
+-    browser = await puppeteer.launch({
++    const puppeteerOptions = {
+       headless: 'new',
+       args: launchArgs,
+-      executablePath: execPath || puppeteer.executablePath(),
+       ignoreHTTPSErrors: true,
+-    });
++    };
++
++    // Only override if explicitly set in .env
++    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
++      puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
++    }
++
++    browser = await puppeteer.launch(puppeteerOptions);
+ 
+     const page = await browser.newPage();
+ 
+
+commit 2d1a9d8afbe851fe5bedbf466b7364bac62e4e70
+Author: Your Name <you@example.com>
+Date:   Tue Feb 24 17:40:03 2026 +0530
+
+    fix: add /api prefix to all frontend API calls and improve Puppeteer Chrome detection on Render
+
+diff --git a/server/index.js b/server/index.js
+index 8c8b281..1a2cd5f 100644
+--- a/server/index.js
++++ b/server/index.js
+@@ -1,88 +1,106 @@
+-const express = require('express');
+-const puppeteer = require('puppeteer');
+-const cors = require('cors');
+-const connectDB = require('./config/db');
+-
+-require('dotenv').config();
+-
+-connectDB();
+-
+-const app = express();
+-const PORT = process.env.PORT || 3000;
+-
+-app.use(cors());
+-app.use(express.json());
+-
+-// Routes
+-app.use('/api/auth', require('./routes/authRoutes'));
+-app.use('/api/tool', require('./routes/toolRoutes'));
+-app.use('/api/monitor', require('./routes/monitorRoutes'));
+-app.use('/api/blogs', require('./routes/blogRoutes'));
+-app.use('/api/stats', require('./routes/statsRoutes'));
+-
+-const { protect } = require('./middleware/authMiddleware');
+-
+-// Centralized Screenshot Route
+-app.get('/api/screenshot', async (req, res) => {
+-  const { url, view } = req.query;
+-
+-  if (!url) {
+-    return res.status(400).json({ error: 'URL is required' });
+-  }
+-
+-  let targetUrl = url;
+-  if (!/^https?:\/\//i.test(targetUrl)) {
+-    targetUrl = `https://${targetUrl}`;
+-  }
+-
+-  let browser = null;
+-  try {
+-    const isRender = process.env.RENDER === 'true';
+-    const launchArgs = [
+-      '--no-sandbox',
+-      '--disable-setuid-sandbox',
+-      '--disable-dev-shm-usage',
+-      '--disable-accelerated-2d-canvas',
+-      '--no-first-run',
+-      '--no-zygote',
+-      '--disable-gpu',
+-    ];
+-
+-    if (isRender) {
+-      launchArgs.push('--single-process');
+-    }
+-
+-    browser = await puppeteer.launch({
+-      headless: 'new',
+-      args: launchArgs,
+-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(),
+-      ignoreHTTPSErrors: true,
+-    });
+-
+-    const page = await browser.newPage();
+-
+-    if (view === 'mobile') {
+-      await page.setViewport({ width: 375, height: 812, isMobile: true, hasTouch: true });
+-    } else {
+-      await page.setViewport({ width: 1920, height: 1080 });
+-    }
+-
+-    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+-    await new Promise(r => setTimeout(r, 1000));
+-
+-    const screenshotBuffer = await page.screenshot({ encoding: 'binary', type: 'png' });
+-
+-    res.set('Content-Type', 'image/png');
+-    res.send(screenshotBuffer);
+-
+-  } catch (error) {
+-    console.error('Screenshot error:', error);
+-    res.status(500).json({ error: 'Failed to capture screenshot', details: error.message });
+-  } finally {
+-    if (browser) await browser.close();
+-  }
+-});
+-
+-app.listen(PORT, () => {
+-  console.log(`Server running on port ${PORT}`);
++const express = require('express');
++const puppeteer = require('puppeteer');
++const cors = require('cors');
++const connectDB = require('./config/db');
++
++require('dotenv').config();
++
++connectDB();
++
++const app = express();
++const PORT = process.env.PORT || 3000;
++
++app.use(cors());
++app.use(express.json());
++
++// Routes
++app.use('/api/auth', require('./routes/authRoutes'));
++app.use('/api/tool', require('./routes/toolRoutes'));
++app.use('/api/monitor', require('./routes/monitorRoutes'));
++app.use('/api/blogs', require('./routes/blogRoutes'));
++app.use('/api/stats', require('./routes/statsRoutes'));
++
++const { protect } = require('./middleware/authMiddleware');
++
++// Centralized Screenshot Route
++app.get('/api/screenshot', async (req, res) => {
++  const { url, view } = req.query;
++
++  if (!url) {
++    return res.status(400).json({ error: 'URL is required' });
++  }
++
++  let targetUrl = url;
++  if (!/^https?:\/\//i.test(targetUrl)) {
++    targetUrl = `https://${targetUrl}`;
++  }
++
++  let browser = null;
++  try {
++    const isRender = process.env.RENDER === 'true';
++    const launchArgs = [
++      '--no-sandbox',
++      '--disable-setuid-sandbox',
++      '--disable-dev-shm-usage',
++      '--disable-accelerated-2d-canvas',
++      '--no-first-run',
++      '--no-zygote',
++      '--disable-gpu',
++    ];
++
++    if (isRender) {
++      launchArgs.push('--single-process');
++    }
++
++    // Determine Chrome executable path
++    let execPath = process.env.PUPPETEER_EXECUTABLE_PATH;
++    if (!execPath) {
++      const fs = require('fs');
++      const possiblePaths = [
++        '/usr/bin/google-chrome-stable',
++        '/usr/bin/google-chrome',
++        '/usr/bin/chromium-browser',
++        '/usr/bin/chromium',
++      ];
++      for (const p of possiblePaths) {
++        if (fs.existsSync(p)) {
++          execPath = p;
++          break;
++        }
++      }
++    }
++
++    browser = await puppeteer.launch({
++      headless: 'new',
++      args: launchArgs,
++      executablePath: execPath || puppeteer.executablePath(),
++      ignoreHTTPSErrors: true,
++    });
++
++    const page = await browser.newPage();
++
++    if (view === 'mobile') {
++      await page.setViewport({ width: 375, height: 812, isMobile: true, hasTouch: true });
++    } else {
++      await page.setViewport({ width: 1920, height: 1080 });
++    }
++
++    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
++    await new Promise(r => setTimeout(r, 1000));
++
++    const screenshotBuffer = await page.screenshot({ encoding: 'binary', type: 'png' });
++
++    res.set('Content-Type', 'image/png');
++    res.send(screenshotBuffer);
++
++  } catch (error) {
++    console.error('Screenshot error:', error);
++    res.status(500).json({ error: 'Failed to capture screenshot', details: error.message });
++  } finally {
++    if (browser) await browser.close();
++  }
++});
++
++app.listen(PORT, () => {
++  console.log(`Server running on port ${PORT}`);
+ });
+\ No newline at end of file
+
+commit 6f6afac072aa73b96545faa0c97e94f0ce0268bf
+Author: Your Name <you@example.com>
+Date:   Tue Feb 24 13:40:42 2026 +0530
+
+    feat: init complete project frontend and backend with tailwind auth emailing and puppeteer
+
+diff --git a/server/index.js b/server/index.js
+new file mode 100644
+index 0000000..8c8b281
+--- /dev/null
++++ b/server/index.js
+@@ -0,0 +1,88 @@
++const express = require('express');
++const puppeteer = require('puppeteer');
++const cors = require('cors');
++const connectDB = require('./config/db');
++
++require('dotenv').config();
++
++connectDB();
++
++const app = express();
++const PORT = process.env.PORT || 3000;
++
++app.use(cors());
++app.use(express.json());
++
++// Routes
++app.use('/api/auth', require('./routes/authRoutes'));
++app.use('/api/tool', require('./routes/toolRoutes'));
++app.use('/api/monitor', require('./routes/monitorRoutes'));
++app.use('/api/blogs', require('./routes/blogRoutes'));
++app.use('/api/stats', require('./routes/statsRoutes'));
++
++const { protect } = require('./middleware/authMiddleware');
++
++// Centralized Screenshot Route
++app.get('/api/screenshot', async (req, res) => {
++  const { url, view } = req.query;
++
++  if (!url) {
++    return res.status(400).json({ error: 'URL is required' });
++  }
++
++  let targetUrl = url;
++  if (!/^https?:\/\//i.test(targetUrl)) {
++    targetUrl = `https://${targetUrl}`;
++  }
++
++  let browser = null;
++  try {
++    const isRender = process.env.RENDER === 'true';
++    const launchArgs = [
++      '--no-sandbox',
++      '--disable-setuid-sandbox',
++      '--disable-dev-shm-usage',
++      '--disable-accelerated-2d-canvas',
++      '--no-first-run',
++      '--no-zygote',
++      '--disable-gpu',
++    ];
++
++    if (isRender) {
++      launchArgs.push('--single-process');
++    }
++
++    browser = await puppeteer.launch({
++      headless: 'new',
++      args: launchArgs,
++      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(),
++      ignoreHTTPSErrors: true,
++    });
++
++    const page = await browser.newPage();
++
++    if (view === 'mobile') {
++      await page.setViewport({ width: 375, height: 812, isMobile: true, hasTouch: true });
++    } else {
++      await page.setViewport({ width: 1920, height: 1080 });
++    }
++
++    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
++    await new Promise(r => setTimeout(r, 1000));
++
++    const screenshotBuffer = await page.screenshot({ encoding: 'binary', type: 'png' });
++
++    res.set('Content-Type', 'image/png');
++    res.send(screenshotBuffer);
++
++  } catch (error) {
++    console.error('Screenshot error:', error);
++    res.status(500).json({ error: 'Failed to capture screenshot', details: error.message });
++  } finally {
++    if (browser) await browser.close();
++  }
++});
++
++app.listen(PORT, () => {
++  console.log(`Server running on port ${PORT}`);
++});
+\ No newline at end of file
