@@ -16,27 +16,57 @@ const generateToken = (id) => {
 const registerUser = async (req, res) => {
     let { username, email, password } = req.body;
     if (email) email = email.toLowerCase();
+
     if (!username || !email || !password) {
         return res.status(400).json({ message: 'Please add all fields' });
     }
+
     const userExists = await User.findOne({ email });
     if (userExists) {
+        if (!userExists.isVerified) {
+            return res.status(400).json({ message: 'User already exists but is unverified. Please log in to request a new OTP.' });
+        }
         return res.status(400).json({ message: 'User already exists' });
     }
+
+    // Create the unverified user
     const user = await User.create({
         username,
         email,
         password,
-        isVerified: true
+        isVerified: false
     });
 
     if (user) {
-        res.status(201).json({
-            _id: user.id,
-            username: user.username,
-            email: user.email,
-            token: generateToken(user._id)
+        // Generate 6-digit crypto-random OTP
+        const otpString = crypto.randomInt(100000, 999999).toString();
+
+        // Hash the OTP
+        const salt = await bcrypt.genSalt(10);
+        const hashedOtp = await bcrypt.hash(otpString, salt);
+
+        // Delete any existing OTPs for email (cleanup)
+        await Otp.deleteMany({ email });
+
+        // Save to DB
+        await Otp.create({
+            email,
+            otp: hashedOtp
         });
+
+        // Send Email
+        console.log("Sending OTP to:", email);
+        const emailResult = await sendVerificationEmail(email, otpString);
+
+        if (!emailResult.success) {
+            // Rollback User and OTP writes if email completely fails
+            await User.findByIdAndDelete(user._id);
+            await Otp.deleteMany({ email });
+            return res.status(500).json({ message: "Failed to send OTP", error: emailResult.error });
+        }
+
+        // Return 200 OK without JWT (Client will redirect to /verify-otp logic)
+        res.status(200).json({ message: 'User registered successfully. Please check your email for the OTP.' });
     } else {
         res.status(400).json({ message: 'Invalid user data' });
     }
@@ -94,8 +124,8 @@ const resendOtp = async (req, res) => {
         return res.status(400).json({ message: 'User is already verified' });
     }
 
-    // Generate new 6-digit OTP
-    const otpString = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate new 6-digit crypto-random OTP
+    const otpString = crypto.randomInt(100000, 999999).toString();
 
     const salt = await bcrypt.genSalt(10);
     const hashedOtp = await bcrypt.hash(otpString, salt);
@@ -125,6 +155,12 @@ const loginUser = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (user && (await user.matchPassword(password))) {
+        if (!user.isVerified) {
+            return res.status(403).json({
+                message: 'Please verify your email address to log in.',
+                notVerified: true
+            });
+        }
         res.json({
             _id: user.id,
             username: user.username,

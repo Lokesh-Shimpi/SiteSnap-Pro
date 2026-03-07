@@ -1,70 +1,50 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 
-// Custom Hook for Animate Count Up on Scroll
-function useCountUp(endValue, duration = 2000) {
+// Custom hook for smoothly animating numbers counting up
+const useCountUp = (end, duration = 2000) => {
     const [count, setCount] = useState(0);
-    const [isVisible, setIsVisible] = useState(false);
-    const elementRef = useRef(null);
-    const hasAnimated = useRef(false);
 
     useEffect(() => {
-        const observer = new IntersectionObserver(([entry]) => {
-            if (entry.isIntersecting && !hasAnimated.current) {
-                setIsVisible(true);
-                hasAnimated.current = true;
-            }
-        }, { threshold: 0.1 });
+        let startTime = null;
+        let animationFrame;
 
-        if (elementRef.current) observer.observe(elementRef.current);
-        return () => observer.disconnect();
-    }, []);
+        const animate = (currentTime) => {
+            if (!startTime) startTime = currentTime;
+            const progress = Math.min((currentTime - startTime) / duration, 1);
 
-    useEffect(() => {
-        if (!isVisible || endValue === 0) return;
+            // Ease out exponentional for a natural deceleration effect
+            const easeOutProgress = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
 
-        let startTimestamp = null;
-        const step = (timestamp) => {
-            if (!startTimestamp) startTimestamp = timestamp;
-            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-
-            // Ease out cubic function for premium deceleration feel
-            const easeOut = 1 - Math.pow(1 - progress, 3);
-            setCount(Math.floor(easeOut * endValue));
+            setCount(Math.floor(easeOutProgress * end));
 
             if (progress < 1) {
-                requestAnimationFrame(step);
-            } else {
-                setCount(endValue);
+                animationFrame = requestAnimationFrame(animate);
             }
         };
-        requestAnimationFrame(step);
 
-    }, [isVisible, endValue, duration]);
+        if (end > 0) {
+            animationFrame = requestAnimationFrame(animate);
+        }
 
-    return { count, elementRef };
-}
+        return () => cancelAnimationFrame(animationFrame);
+    }, [end, duration]);
 
-import { Users, Activity, Globe } from 'lucide-react';
+    return count;
+};
 
-// Single Stat Component
-const StatItem = ({ label, value, Icon, gradient }) => {
-    const { count, elementRef } = useCountUp(value, 2000);
+// Component for a single stat item
+const StatItem = ({ label, value }) => {
+    const animatedValue = useCountUp(value, 2500);
 
     return (
-        <div ref={elementRef} className="flex flex-col items-center justify-center p-8 bg-white dark:bg-[#000000] rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700/50">
-                    <Icon className="h-5 w-5 text-indigo-500/80 dark:text-indigo-400" />
-                </div>
-                <span className="text-xs font-bold tracking-widest text-slate-500 dark:text-slate-400 uppercase">
-                    {label}
-                </span>
-            </div>
-
-            <div className={`text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-br ${gradient} bg-clip-text text-transparent`}>
-                {count.toLocaleString()}
-            </div>
+        <div className="flex flex-col items-center justify-center p-6 sm:p-8 animate-fade-in-up">
+            <span className="text-4xl sm:text-5xl md:text-6xl font-mono font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent mb-3 drop-shadow-sm">
+                {animatedValue.toLocaleString()}{value > 0 ? "+" : ""}
+            </span>
+            <span className="text-xs sm:text-sm font-bold tracking-[0.2em] text-slate-400 uppercase text-center">
+                {label}
+            </span>
         </div>
     );
 };
@@ -73,50 +53,57 @@ export default function LiveStatsBanner() {
     const [stats, setStats] = useState({
         registeredUsers: 0,
         totalScans: 0,
-        uniqueSites: 0
+        uniqueWebsites: 0
     });
+    const [isVisible, setIsVisible] = useState(false);
 
     useEffect(() => {
+        // Fetch public stats securely cached on the backend
         const fetchStats = async () => {
             try {
-                const res = await api.get('/api/stats/public');
-                const data = res.data;
-
-                if (data && typeof data.registeredUsers !== 'undefined') {
-                    setStats(data);
-                }
-            } catch (err) {
-                console.error('Error fetching live stats:', err);
+                const { data } = await api.get('/api/stats/public');
+                setStats({
+                    registeredUsers: data.registeredUsers || 0,
+                    totalScans: data.totalScans || 0,
+                    uniqueWebsites: data.uniqueWebsites || 0
+                });
+            } catch (error) {
+                console.error("Failed to fetch public stats:", error);
             }
         };
 
         fetchStats();
+
+        // Trigger the animation only when the user scrolls to see the banner
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    setIsVisible(true);
+                    observer.disconnect();
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        const element = document.getElementById('live-stats-banner');
+        if (element) {
+            observer.observe(element);
+        }
+
+        return () => observer.disconnect();
     }, []);
 
     return (
-        <section className="w-full bg-slate-50 dark:bg-[#0B1120] border-t border-b border-slate-200 dark:border-slate-800 py-16 relative z-10 transition-colors duration-300">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <StatItem
-                        label="Registered Users"
-                        value={stats.registeredUsers}
-                        Icon={Users}
-                        gradient="from-indigo-400 to-violet-400"
-                    />
-                    <StatItem
-                        label="Total Scans Run"
-                        value={stats.totalScans}
-                        Icon={Activity}
-                        gradient="from-emerald-400 to-teal-400"
-                    />
-                    <StatItem
-                        label="Unique Sites"
-                        value={stats.uniqueSites}
-                        Icon={Globe}
-                        gradient="from-sky-400 to-blue-400"
-                    />
-                </div>
+        <div id="live-stats-banner" className="w-full bg-slate-950 border-t border-b border-slate-800/50 py-8 lg:py-12">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                {isVisible && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-4 divide-y md:divide-y-0 md:divide-x divide-slate-800/50">
+                        <StatItem label="Registered Devs" value={stats.registeredUsers} />
+                        <StatItem label="Total Scans Run" value={stats.totalScans} />
+                        <StatItem label="Sites Monitored" value={stats.uniqueWebsites} />
+                    </div>
+                )}
             </div>
-        </section>
+        </div>
     );
 }
