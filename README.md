@@ -12,9 +12,7 @@
 
 ## 🎥 Live Demo & Preview
 
-[![SiteSnap Pro Demo Video](./demo-thumbnail.png)](link-to-video)
-
-> *Note: The attached video demonstrates the fully functional application running on the local host environment, showcasing the Visual Regression Engine in action.*
+[![SiteSnap Pro Demo Video](./demo-thumbnail.png)]([link-to-video](https://youtu.be/vWeHj8ZigSg?si=jOwTfWQPkjoqgXUK))
 
 ---
 
@@ -103,3 +101,4 @@ Create a clean `.env` file in the root of your `server` directory and add the fo
 ## 👨‍💻 Author
 
 **Lokesh Shimpi**
+
