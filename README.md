@@ -12,8 +12,8 @@
 
 ## 🎥 Live Demo & Preview
 
-[SiteSnap Pro Demo Video]((https://youtu.be/vWeHj8ZigSg?si=jOwTfWQPkjoqgXUK))
-
+[https://youtu.be/vWeHj8ZigSg?si=jOwTfWQPkjoqgXU
+](https://youtu.be/vWeHj8ZigSg?si=jOwTfWQPkjoqgXUK)
 ---
 
 ## 🛠️ Tech Stack
@@ -101,5 +101,6 @@ Create a clean `.env` file in the root of your `server` directory and add the fo
 ## 👨‍💻 Author
 
 **Lokesh Shimpi**
+
 
 
